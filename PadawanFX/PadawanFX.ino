@@ -45,20 +45,18 @@ Placed a 10K ohm resistor between S1 & GND on the Syren10en 10 itself
 #include <Servo.h>
 #include <Wire.h>
 #include <XBOXRECV.h>
+#include "Utility.h"
 #include "PadawanFXConfig.h"
 
 // These are the pins for the Sabertooth and Syren10en
 SoftwareSerial STSerial(NOT_A_PIN, 4);
-SoftwareSerial Syren10Serial(2, 5);
+SoftwareSerial Syren10Serial(NOT_A_PIN, 5);
 SoftwareSerial trigSerial = SoftwareSerial(NOT_A_PIN, 7);
 
-/////////////////////////////////////////////////////////////////
 Sabertooth Sabertooth2xXX(128, STSerial);
 Sabertooth Syren10(128, Syren10Serial);
 
-// Set some defaults for start up
-// 0 = full volume, 255 off
-byte vol = 20;
+byte vol = DEFAULT_VOLUME;
 // 0 = drive motors off ( right stick disabled ) at start
 boolean isDriveEnabled = false;
 
@@ -67,8 +65,10 @@ boolean isDriveEnabled = false;
 boolean isInAutomationMode = false;
 unsigned long automateMillis = 0;
 byte automateDelay = random(5, 20); // set this to min and max seconds between sounds
+
 //How much the dome may turn during automation.
 int turnDirection = 20;
+
 // Action number used to randomly choose a sound effect or a dome turn
 byte automateAction = 0;
 char driveThrottle = 0;
@@ -83,13 +83,13 @@ USB Usb;
 XBOXRECV Xbox(&Usb);
 
 void setup() {
-  Serial.begin(250000);
+  Serial.begin(38400);
   // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
   while (!Serial);
   Serial.println(F("PadawanFX"));
 
   if (Usb.Init() == -1) {
-    Serial.print(F("\r\nOSC did not start"));
+    Serial.println(F("\r\nOSC did not start"));
     while (1); //halt
   }
 
@@ -97,10 +97,9 @@ void setup() {
   Syren10.autobaud();
   Syren10.setTimeout(950);
 
-  // 9600 is the default baud rate for Sabertooth packet serial.
-  STSerial.begin(9600);
+  STSerial.begin(STBAUDRATE);
   // Send the autobaud command to the Sabertooth controller(s).
-  //Sabertooth2xXX.autobaud();
+  // Sabertooth2xXX.autobaud();
   Sabertooth2xXX.setTimeout(950);
 
   // The Sabertooth won't act on mixed mode packet serial commands until
@@ -110,6 +109,7 @@ void setup() {
   Sabertooth2xXX.turn(0);
 
   mp3Trigger.setup(&trigSerial);
+  trigSerial.begin(38400);
   mp3Trigger.setVolume(vol);
 }
 
@@ -124,13 +124,14 @@ void loop() {
     Sabertooth2xXX.turn(0);
     Syren10.motor(1, 0);
     firstLoadOnConnect = false;
+    xboxBtnPressedSince = 0;
     return;
   }
 
   // After the controller connects, Blink all the LEDs so we know drives are disengaged at start
   if (!firstLoadOnConnect) {
     firstLoadOnConnect = true;
-    mp3Trigger.play(21);
+    mp3Trigger.play(CONTROLLER_CONNECTED);
     Xbox.setLedMode(ROTATING, 0);
   }
 
@@ -139,10 +140,10 @@ void loop() {
     if (isDriveEnabled) {
       isDriveEnabled = false;
       Xbox.setLedMode(ROTATING, 0);
-      mp3Trigger.play(53);
+      mp3Trigger.play(random(HUM_SND_START, HUM_SND_END));
     } else {
       isDriveEnabled = true;
-      mp3Trigger.play(52);
+      mp3Trigger.play(PROC_SND_START);
       // //When the drive is enabled, set our LED accordingly to indicate speed
       if (drivespeed == DRIVESPEED1) {
         Xbox.setLedOn(LED1, 0);
@@ -159,10 +160,10 @@ void loop() {
     if (isInAutomationMode) {
       isInAutomationMode = false;
       automateAction = 0;
-      mp3Trigger.play(53);
+      mp3Trigger.play(PROC_SND_START);
     } else {
       isInAutomationMode = true;
-      mp3Trigger.play(52);
+      mp3Trigger.play(random(PROC_SND_START + 1, PROC_SND_END));
     }
   }
 
@@ -175,7 +176,7 @@ void loop() {
       automateAction = random(1, 5);
 
       if (automateAction > 1) {
-        mp3Trigger.play(random(32, 52));
+        mp3Trigger.play(random(AUTO_SND_START, AUTO_SND_END));
       }
       if (automateAction < 4) {
         Syren10.motor(1, turnDirection);
@@ -188,7 +189,7 @@ void loop() {
         }
       }
       // sets the mix, max seconds between automation actions - sounds and dome movement
-      automateDelay = random(5, 20);
+      automateDelay = random(AUTO_TIME_MIN, AUTO_TIME_MAX);
     }
   }
 
@@ -198,7 +199,11 @@ void loop() {
     // volume up
     if (Xbox.getButtonPress(R1, 0)) {
       if (vol > 0) {
-        vol--;
+        if (vol < 3) {
+          vol--;
+        } else {
+          vol-=3;
+        }
         mp3Trigger.setVolume(vol);
       }
     }
@@ -206,8 +211,8 @@ void loop() {
   if (Xbox.getButtonClick(DOWN, 0)) {
     //volume down
     if (Xbox.getButtonPress(R1, 0)) {
-      if (vol < 255) {
-        vol++;
+      if (vol < 75) {
+        vol+=3;
         mp3Trigger.setVolume(vol);
       }
     }
@@ -215,70 +220,70 @@ void loop() {
 
   // Logic display brightness.
   // Hold L1 and press up/down on dpad to increase/decrease brightness
-  if (Xbox.getButtonClick(UP, 0)) {
-    if (Xbox.getButtonPress(L1, 0)) {
-    }
-  }
-  if (Xbox.getButtonClick(DOWN, 0)) {
-    if (Xbox.getButtonPress(L1, 0)) {
-    }
-  }
+//  if (Xbox.getButtonClick(UP, 0)) {
+//    if (Xbox.getButtonPress(L1, 0)) {
+//    }
+//  }
+//  if (Xbox.getButtonClick(DOWN, 0)) {
+//    if (Xbox.getButtonPress(L1, 0)) {
+//    }
+//  }
 
   // Y Button and Y combo buttons
   if (Xbox.getButtonClick(Y, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      mp3Trigger.play(8);
+      mp3Trigger.play(random(LEIA_SND_START, LEIA_SND_END));
     } else if (Xbox.getButtonPress(L2, 0)) {
-      mp3Trigger.play(2);
+      mp3Trigger.play(random(SCREAM_SND_START, SCREAM_SND_END));
     } else if (Xbox.getButtonPress(R1, 0)) {
-      mp3Trigger.play(9);
+      mp3Trigger.play(SW_SND_THEME);
+    } else if (Xbox.getButtonPress(R2, 0)) {
+      mp3Trigger.play(PATROL_SND);
     } else {
-      mp3Trigger.play(random(13, 17));
+      mp3Trigger.play(random(HUM_SND_START, HUM_SND_END));
+    }
+  }
+
+  // X Button and X combo Buttons
+  if (Xbox.getButtonClick(X, 0)) {
+    if (Xbox.getButtonPress(L1, 0)) {
+      mp3Trigger.play(random(CHAT_SND_START, CHAT_SND_END));
+    } else if (Xbox.getButtonPress(L2, 0)) {
+      mp3Trigger.play(random(WHISTLE_SND_START, WHISTLE_SND_END));
+    } else if (Xbox.getButtonPress(R1, 0)) {
+      mp3Trigger.play(EMPIRE_SND_THEME);
+    } else {
+      mp3Trigger.play(random(GEN_SND_START, GEN_SND_END));
     }
   }
 
   // A Button and A combo Buttons
   if (Xbox.getButtonClick(A, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      mp3Trigger.play(6);
+      mp3Trigger.play(DOODOO_SND);
     } else if (Xbox.getButtonPress(L2, 0)) {
-      mp3Trigger.play(1);
+      mp3Trigger.play(OVERHERE_SND);
     } else if (Xbox.getButtonPress(R1, 0)) {
-      mp3Trigger.play(11);
-
+      mp3Trigger.play(CANTINA_SND_THEME);
+    } else if (Xbox.getButtonPress(R2, 0)) {
+      mp3Trigger.play(random(R2THEME_MUS_START, R2THEME_MUS_END));
     } else {
-      mp3Trigger.play(random(17, 25));
-
+      mp3Trigger.play(random(HAPPY_SND_START, HAPPY_SND_END));
     }
   }
 
   // B Button and B combo Buttons
   if (Xbox.getButtonClick(B, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      mp3Trigger.play(7);
+      mp3Trigger.play(random(SAD_SND_START, SAD_SND_END));
     } else if (Xbox.getButtonPress(L2, 0)) {
-      mp3Trigger.play(3);
+      mp3Trigger.play(random(RANDOM_MUS_START, RANDOM_MUS_END));
     } else if (Xbox.getButtonPress(R1, 0)) {
-      mp3Trigger.play(10);
+      mp3Trigger.play(SW_CHORUS_THEME);
+    } else if (Xbox.getButtonPress(R2, 0)) {
+      mp3Trigger.play(ANNOYED_SND);
     } else {
-      mp3Trigger.play(random(32, 52));
-
-    }
-  }
-
-  // X Button and X combo Buttons
-  if (Xbox.getButtonClick(X, 0)) {
-    // leia message L1+X
-    if (Xbox.getButtonPress(L1, 0)) {
-      mp3Trigger.play(5);
-
-    } else if (Xbox.getButtonPress(L2, 0)) {
-      mp3Trigger.play(4);
-
-    } else if (Xbox.getButtonPress(R1, 0)) {
-      mp3Trigger.play(12);
-    } else {
-      mp3Trigger.play(random(25, 32));
+      mp3Trigger.play(random(PROC_SND_START, PROC_SND_END));
     }
   }
 
@@ -296,19 +301,17 @@ void loop() {
       //change to medium speed and play sound 3-tone
       drivespeed = DRIVESPEED2;
       Xbox.setLedOn(LED2, 0);
-      mp3Trigger.play(53);
     } else if (drivespeed == DRIVESPEED2 && (DRIVESPEED3 != 0)) {
       //change to high speed and play sound scream
       drivespeed = DRIVESPEED3;
       Xbox.setLedOn(LED3, 0);
-      mp3Trigger.play(1);
     } else {
       //we must be in high speed
       //change to low speed and play sound 2-tone
       drivespeed = DRIVESPEED1;
       Xbox.setLedOn(LED1, 0);
-      mp3Trigger.play(52);
     }
+    mp3Trigger.play(PROC_SND_START);
   }
 
 
@@ -375,8 +378,10 @@ void loop() {
   proccessControllerShutdown();
   //printControllerStatus();
   //printThrottle();
-  countCycles();
+  //countCycles();
+  mp3Trigger.update();
 } // END loop()
+
 
 /**
  * Determines if the controller needs to be shutdown.  The disconnect signal is sent once the XBOX 
@@ -387,6 +392,8 @@ void proccessControllerShutdown() {
     if (xboxBtnPressedSince == 0) {
       xboxBtnPressedSince = millis();
     } else if (millis() - xboxBtnPressedSince > 3000) {
+      Serial.print(F("Shutting down controller.  Elapsed time: "));
+      Serial.println(xboxBtnPressedSince);
       Xbox.setRumbleOn(50, 127, 0);
       xboxBtnPressedSince = 0;
       delay(500);
@@ -397,25 +404,12 @@ void proccessControllerShutdown() {
   }
 }
 
-long time = 0;
-int cycles = 0;
-
-void countCycles() {
-  if (millis() - time > 1000) {
-    Serial.println(cycles);
-    cycles = 1;
-    time = millis();
-  } else {
-    cycles++;
-  }
-}
-
 void printThrottle() {
-  Serial.print("TURN: ");
+  Serial.print(F("TURN: "));
   Serial.print(-turnThrottle, DEC);
-  Serial.print(", DRIVE THROTTLE: ");
+  Serial.print(F(", DRIVE THROTTLE: "));
   Serial.print(driveThrottle, DEC);
-  Serial.print(" DOME THROTTLE: ");
+  Serial.print(F(" DOME THROTTLE: "));
   Serial.println(domeThrottle, DEC);
 }
 
@@ -429,11 +423,5 @@ void printControllerStatus() {
   Serial.print(F(", Y="));
   Serial.print(Xbox.getAnalogHat(RightHatY, 0));
   Serial.println(F(")"));
-}
-
-int freeRam () {
-  extern int __heap_start, *__brkval;
-  int v;
-  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
 

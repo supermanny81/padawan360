@@ -15,17 +15,17 @@ Doesn't handle messages from the trigger at this point
   #include "WProgram.h"
   #endif
 
-#include <SoftwareSerial.h>
-
 class MP3TriggerSS{
   public:
 	MP3TriggerSS();
 	~MP3TriggerSS();
-	void setup(SoftwareSerial* serial);
+	void setup(Stream* serial);
   	void play();
 	void stop();
 	void trigger(byte track);	//1–255
 	void play(byte track);		//0—255
+  void play(int track);    //0—255
+  void play(long track);    //0—255
 	void forward();				//move ahead one track
 	void reverse();				//move back one track
 	void setVolume(byte level);	//0-255
@@ -40,7 +40,7 @@ private:
 	byte mLoopTrack;
 	bool mPlaying;
 	void loop();
-	SoftwareSerial* s;
+	Stream* s;
 };
 
-#endif
+#endif  
