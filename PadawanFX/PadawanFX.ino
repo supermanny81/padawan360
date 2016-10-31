@@ -1,3 +1,5 @@
+
+
 // =======================================================================================
 // /////////////////////////Padawan360 Body Code v1.0 ////////////////////////////////////
 // =======================================================================================
@@ -38,7 +40,6 @@ Placed a 10K ohm resistor between S1 & GND on the Syren10en 10 itself
 
 
 #include <SoftwareSerial.h>
-#include "MP3TriggerSS.h"
 #include <SPI.h>
 #include <Sabertooth.h>
 #include <SyRenSimplified.h>
@@ -47,6 +48,9 @@ Placed a 10K ohm resistor between S1 & GND on the Syren10en 10 itself
 #include <XBOXRECV.h>
 #include "Utility.h"
 #include "PadawanFXConfig.h"
+#include <AltSoftSerial.h>    // Arduino build environment requires this
+#include <wavTrigger.h>
+
 
 // These are the pins for the Sabertooth and Syren10en
 SoftwareSerial STSerial(NOT_A_PIN, 4);
