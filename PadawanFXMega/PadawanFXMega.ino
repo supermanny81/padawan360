@@ -49,8 +49,6 @@ Connect 2 wires from the UNO to the WAV Trigger's serial connector:
     5V   <------> 5V
 
 */
-#include <SoftwareSerial.h>
-#include <AltSoftSerial.h>
 #include <SPI.h>
 #include <Sabertooth.h>
 #include <SyRenSimplified.h>
@@ -60,19 +58,12 @@ Connect 2 wires from the UNO to the WAV Trigger's serial connector:
 #include "PadawanFXConfig.h"
 #include "wavTrigger2.h"
 
-
-// These are the pins for the Sabertooth and Syren10en
-//SoftwareSerial STSerial(NOT_A_PIN, 4);
-//SoftwareSerial Syren10Serial(NOT_A_PIN, 5);
-
 Sabertooth Sabertooth2xXX(128, Serial1);
 Sabertooth Syren10(128, Serial2);
-
-// Software Serial
-AltSoftSerial WTSerial(8, 9);
 wavTrigger2 wTrig;
 
 char vol = DEFAULT_VOLUME;
+
 // 0 = drive motors off ( right stick disabled ) at start
 boolean isDriveEnabled = false;
 
@@ -100,6 +91,7 @@ XBOXRECV Xbox(&Usb);
 
 void setup() {
   Serial.begin(115200);
+
   // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
   while (!Serial);
   Serial.println(F("PadawanFX"));
@@ -109,13 +101,14 @@ void setup() {
     while (1); //halt
   }
 
-  Syren10Serial.begin(DOMEBAUDRATE);
-  Syren10.autobaud();
+  //Syren10Serial.begin(DOMEBAUDRATE);
+  //Syren10.autobaud();
+  Serial2.begin(DOMEBAUDRATE);
   Syren10.setTimeout(950);
 
-  STSerial.begin(STBAUDRATE);
   // Send the autobaud command to the Sabertooth controller(s).
-  // Sabertooth2xXX.autobaud();
+  //Sabertooth2xXX.autobaud();
+  Serial1.begin(9600);
   Sabertooth2xXX.setTimeout(950);
 
   // The Sabertooth won't act on mixed mode packet serial commands until
@@ -125,8 +118,7 @@ void setup() {
   Sabertooth2xXX.turn(0);
 
   // WAV Trigger startup
-  // WTSerial.begin(57600);
-  Serial3.begin(57600);
+  Serial3.begin(WAVBAUDRATE);
   wTrig.setup(&Serial3);
   wTrig.stopAllTracks();
   printWTrigStatus();
@@ -146,6 +138,7 @@ void loop() {
     firstLoadOnConnect = false;
     xboxBtnPressedSince = 0;
     return;
+    
   }
 
   // After the controller connects, Blink all the LEDs so we know drives are disengaged at start
@@ -479,4 +472,3 @@ void printControllerStatus() {
   Serial.print(Xbox.getAnalogHat(RightHatY, 0));
   Serial.println(F(")"));
 }
-
