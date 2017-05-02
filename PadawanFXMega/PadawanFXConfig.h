@@ -34,7 +34,7 @@ const byte TURNSPEED = 70;
 // If using a speed controller for the dome, sets the top speed. You'll want to vary it potenitally
 // depending on your motor. My Pittman is really fast so I dial this down a ways from top speed.
 // Use a number up to 127 for serial
-const byte DOMESPEED = 100;
+const byte DOMESPEED = 110;
 
 // Ramping- the lower this number the longer R2 will take to speedup or slow down,
 // change this by incriments of 1
@@ -66,31 +66,31 @@ const byte DRIVEDEADZONERANGE = 10;
 #define CONTROLLER_CONNECTED 1
 
 #define GEN_SND_START 1
-#define GEN_SND_END 24
+#define GEN_SND_END 25
 
 #define CHAT_SND_START 26
-#define CHAT_SND_END 43
+#define CHAT_SND_END 44
 
 #define HAPPY_SND_START 51
-#define HAPPY_SND_END 58
+#define HAPPY_SND_END 59
 
 #define SAD_SND_START 75
-#define SAD_SND_END 79
+#define SAD_SND_END 80
 
 #define HUM_SND_START 130
-#define HUM_SND_END 155
+#define HUM_SND_END 156
 
 #define LEIA_SND_START 161
-#define LEIA_SND_END 164
+#define LEIA_SND_END 165
 
 #define SCREAM_SND_START 126
-#define SCREAM_SND_END 128
+#define SCREAM_SND_END 129
 
 #define PROC_SND_START 240
-#define PROC_SND_END 244
+#define PROC_SND_END 245
 
 #define WHISTLE_SND_START 101
-#define WHISTLE_SND_END 103
+#define WHISTLE_SND_END 104
 
 #define AUTO_SND_START 1
 #define AUTO_SND_END 50
@@ -102,15 +102,22 @@ const byte DRIVEDEADZONERANGE = 10;
 
 #define MUS_THRILLER 203
 #define RANDOM_MUS_START 179
-#define RANDOM_MUS_END 186
+#define RANDOM_MUS_END 187
+
+#define HOLIDAY_MUS_START 350
+#define HOLIDAY_MUS_END 352
 
 #define R2THEME_MUS_START 176
-#define R2THEME_MUS_END 178
+#define R2THEME_MUS_END 179
 
 #define DOODOO_SND 49
 #define OVERHERE_SND 50
 #define PATROL_SND 48
 #define ANNOYED_SND 75
+
+#define IMPERIAL_SIREN 400
+
+#define BG_MUS_START 255
 
 #endif
 
@@ -124,6 +131,7 @@ Y + L2 = Scream
 
 X = General
 X + R1 = Imperial March
+X + R2 = Holiday Music
 X + L1 = Chat
 X + L2 = Whistle
 

@@ -2,45 +2,45 @@
 // /////////////////////////Padawan360 Body Code v1.0 ////////////////////////////////////
 // =======================================================================================
 /*
-by Dan Kraus
-dskraus@gmail.com
-Astromech: danomite4047
+  by Dan Kraus
+  dskraus@gmail.com
+  Astromech: danomite4047
 
-Heavily influenced by DanF's Padwan code which was built for Arduino+Wireless PS2
-controller leveraging Bill Porter's PS2X Library. I was running into frequent disconnect
-issues with 4 different controllers working in various capacities or not at all. I decided
-that PS2 Controllers were going to be more difficult to come by every day, so I explored
-some existing libraries out there to leverage and came across the USB Host Shield and it's
-support for PS3 and Xbox 360 controllers. Bluetooth dongles were inconsistent as well
-so I wanted to be able to have something with parts that other builder's could easily track
-down and buy parts even at your local big box store.
+  Heavily influenced by DanF's Padwan code which was built for Arduino+Wireless PS2
+  controller leveraging Bill Porter's PS2X Library. I was running into frequent disconnect
+  issues with 4 different controllers working in various capacities or not at all. I decided
+  that PS2 Controllers were going to be more difficult to come by every day, so I explored
+  some existing libraries out there to leverage and came across the USB Host Shield and it's
+  support for PS3 and Xbox 360 controllers. Bluetooth dongles were inconsistent as well
+  so I wanted to be able to have something with parts that other builder's could easily track
+  down and buy parts even at your local big box store.
 
-Hardware:
-Arduino UNO
-USB Host Shield from circuits@home
-Microsoft Xbox 360 Controller
-Xbox 360 USB Wireless Reciver
-Sabertooth Motor Controller
-Syren10en Motor Controller
-Sparkfun WAV Trigger
+  Hardware:
+  Arduino Mega
+  USB Host Shield from circuits@home
+  Microsoft Xbox 360 Controller
+  Xbox 360 USB Wireless Reciver
+  Sabertooth Motor Controller
+  Syren10en Motor Controller
+  Sparkfun WAV Trigger
 
-This sketch supports I2C and calls events on many sound effect actions to control lights and sounds.
-It is NOT set up for Dan's method of using the serial packet to transfer data up to the dome
-to trigger some light effects. If you want that, you'll need to reference DanF's original
-Padawan code.
+  This sketch supports I2C and calls events on many sound effect actions to control lights and sounds.
+  It is NOT set up for Dan's method of using the serial packet to transfer data up to the dome
+  to trigger some light effects. If you want that, you'll need to reference DanF's original
+  Padawan code.
 
-Set Sabertooth 2x25/2x12 Dip Switches 1 and 2 Down, All Others Up
-For Syren10en Simple Serial Set Switches 1 and 2 Down, All Others Up
-For Syren10en Simple Serial Set Switchs 2 & 4 Down, All Others Up
-Placed a 10K ohm resistor between S1 & GND on the Syren10en 10 itself
+  Set Sabertooth 2x25/2x12 Dip Switches 1 and 2 Down, All Others Up
+  For Syren10en Simple Serial Set Switches 1 and 2 Down, All Others Up
+  For Syren10en Simple Serial Set Switchs 2 & 4 Down, All Others Up
+  Placed a 10K ohm resistor between S1 & GND on the Syren10en 10 itself
 
-Connect 2 wires from the UNO to the WAV Trigger's serial connector:
+  Connect 2 wires from the UNO to the WAV Trigger's serial connector:
 
     Uno           WAV Trigger
     ===           ===========
     GND  <------> GND
     Pin9 <------> RX
-    Pin8 <------> TX (optional, for now)
+    Pin8 <------> TX (Required)
 
     I would not do this since you already have to power the USB shield, but...
     If you want to power the WAV Trigger from the Uno, then close the 5V
@@ -58,6 +58,7 @@ Connect 2 wires from the UNO to the WAV Trigger's serial connector:
 #include "PadawanFXConfig.h"
 #include "wavTrigger2.h"
 
+
 Sabertooth Sabertooth2xXX(128, Serial1);
 Sabertooth Syren10(128, Serial2);
 wavTrigger2 wTrig;
@@ -70,6 +71,7 @@ boolean isDriveEnabled = false;
 // Automated function variables
 // Used as a boolean to turn on/off automated functions like periodic random sounds and periodic dome turns
 boolean isInAutomationMode = false;
+boolean isBgMusicPlaying = false;
 unsigned long automateMillis = 0;
 byte automateDelay = random(5, 20); // set this to min and max seconds between sounds
 
@@ -84,6 +86,9 @@ char domeThrottle = 0;
 char turnThrottle = 0;
 long xboxBtnPressedSince = 0;
 boolean firstLoadOnConnect = false;
+boolean periscopeUp = false;
+boolean periscopeRandomFast = false; //5, then 4
+boolean periscopeSearchLightCCW = false; // send 7, then 3
 
 
 USB Usb;
@@ -91,7 +96,7 @@ XBOXRECV Xbox(&Usb);
 
 void setup() {
   Serial.begin(115200);
-
+  Wire.begin();
   // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
   while (!Serial);
   Serial.println(F("PadawanFX"));
@@ -138,12 +143,13 @@ void loop() {
     firstLoadOnConnect = false;
     xboxBtnPressedSince = 0;
     return;
-    
+
   }
 
   // After the controller connects, Blink all the LEDs so we know drives are disengaged at start
   if (!firstLoadOnConnect) {
     firstLoadOnConnect = true;
+    isDriveEnabled = false;
     playVoice(CONTROLLER_CONNECTED);
     Xbox.setLedMode(ROTATING, 0);
   }
@@ -219,8 +225,11 @@ void loop() {
         }
         setVol(vol);
       }
+    } else if (Xbox.getButtonPress(L1, 0)) {
+      send_periscope_command(6);
     }
   }
+
   if (Xbox.getButtonClick(DOWN, 0)) {
     //volume down
     if (Xbox.getButtonPress(R1, 0)) {
@@ -232,6 +241,48 @@ void loop() {
         }
         setVol(vol);
       }
+    } else if (Xbox.getButtonPress(L1, 0)) {
+      if (periscopeUp) {
+        // periscope down
+        send_periscope_command(1);
+        periscopeSearchLightCCW = false;
+        periscopeRandomFast =  false;
+      } else {
+        // periscope up/down
+        send_periscope_command(2);
+      }
+      periscopeUp = !periscopeUp;
+    }
+  }
+
+  if (Xbox.getButtonClick(RIGHT, 0)) {
+    //volume down
+    if (Xbox.getButtonPress(R1, 0)) {
+
+    } else if (Xbox.getButtonPress(L1, 0)) {
+      if (periscopeSearchLightCCW) {
+        // periscope up/down
+        send_periscope_command(3);
+      } else {
+        // periscope up/down
+        send_periscope_command(7);
+      }
+      periscopeSearchLightCCW = !periscopeSearchLightCCW;
+    }
+  }
+
+  if (Xbox.getButtonClick(LEFT, 0)) {
+    if (Xbox.getButtonPress(R1, 0)) {
+
+    } else if (Xbox.getButtonPress(L1, 0)) {
+      if (periscopeRandomFast) {
+        // periscope up/down
+        send_periscope_command(4);
+      } else {
+        // periscope up/down
+        send_periscope_command(5);
+      }
+      periscopeRandomFast = !periscopeRandomFast;
     }
   }
 
@@ -270,7 +321,7 @@ void loop() {
     } else if (Xbox.getButtonPress(R1, 0)) {
       playVoice(EMPIRE_SND_THEME);
     } else if (Xbox.getButtonPress(R2, 0)) {
-      playVoice(MUS_THRILLER);
+      playVoice(random(HOLIDAY_MUS_START, HOLIDAY_MUS_END));
     } else {
       playVoice(random(GEN_SND_START, GEN_SND_END));
     }
@@ -306,8 +357,9 @@ void loop() {
     }
   }
 
-  // turn hp light on & off with Left Analog Stick Press (L3)
+  // MOVE OUT THE WAY
   if (Xbox.getButtonClick(L3, 0))  {
+    playVoice(IMPERIAL_SIREN);
   }
 
 
@@ -402,9 +454,9 @@ void loop() {
 
 
 /**
- * Determines if the controller needs to be shutdown.  The disconnect signal is sent once the XBOX
- * button has been pressed for more than 3s, a rumble will indicate the controller is being shutdown.
- */
+   Determines if the controller needs to be shutdown.  The disconnect signal is sent once the XBOX
+   button has been pressed for more than 3s, a rumble will indicate the controller is being shutdown.
+*/
 void proccessControllerShutdown() {
   if (Xbox.getButtonPress(XBOX, 0)) {
     if (xboxBtnPressedSince == 0) {
@@ -441,9 +493,30 @@ void printWTrigStatus() {
 }
 
 void playVoice(int track) {
+  wTrig.getStatus();
+  uint16_t* tracks = wTrig.returnTracksPlaying();
+
+  if (track > BG_MUS_START) {
+    isBgMusicPlaying = !isBgMusicPlaying;
+  }
+
+  for (byte i = 0; i < 14; i++) {
+    Serial.print(i);
+    Serial.print(": ");
+    Serial.println(tracks[i]);
+    if (tracks[i] <= BG_MUS_START) {
+      wTrig.trackStop(tracks[i]);
+    } else if (tracks[i] > BG_MUS_START && track > BG_MUS_START && isBgMusicPlaying == false) {
+      wTrig.trackStop(tracks[i]);
+    }
+  }
+
   Serial.print(F("Playing track: "));
   Serial.println(track);
-  wTrig.trackPlaySolo(track);
+  if (track > BG_MUS_START && isBgMusicPlaying == false) {
+    return;
+  }
+  wTrig.trackPlayPoly(track);
 }
 
 void setVol(int vol) {
@@ -459,6 +532,22 @@ void printThrottle() {
   Serial.print(driveThrottle, DEC);
   Serial.print(F(" DOME THROTTLE: "));
   Serial.println(domeThrottle, DEC);
+}
+
+void send_periscope_command(byte cmd) {
+  // 0: DO NOTHING - ALLOW I2C TO TAKE CONTROL
+  // 1: DOWN POSITION - ALL OFF
+  // 2: FAST UP - RANDOM LIGHTS
+  // 3: SEARCHLIGHT - CCW
+  // 4: RANDOM - FAST
+  // 5: RANDOM - SLOW
+  // 6: DAGOBAH - WHITE LIGHTS - FACE FORWARD
+  // 7: SEARCHLIGHT CW
+  Wire.beginTransmission(0x20); // transmit to device #20
+  Wire.write(cmd); // sends one byte 0011
+  Wire.endTransmission(); // stop transmitting
+  Serial.print(F("Sent command: "));
+  Serial.println(cmd, DEC);
 }
 
 void printControllerStatus() {
