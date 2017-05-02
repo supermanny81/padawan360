@@ -11,9 +11,11 @@ void countCycles() {
   if (millis() - time > 1000) {
     Serial.print(cycles);
     Serial.println(F("cycles processed in 1s"));
-    cycles = 1;
     time = millis();
+    cycles = 1;
   } else {
     cycles++;
   }
 }
+
+

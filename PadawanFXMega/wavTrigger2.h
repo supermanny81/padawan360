@@ -5,6 +5,7 @@
 //     Comments: Robertsonics WAV Trigger serial control library
 //
 // Programmers: Jamie Robertson, jamie@robertsonics.com
+//              Manny Garcia, supermanny@icoud.com
 //
 // **************************************************************
 //
@@ -24,19 +25,12 @@
 // 04/26/15  Added support for sample-rate / pitch bend control,
 //           and compile macro switches for hardware serial ports.
 //
+// 10/03/16  Changed to use streams, allow for HW or Software serial.
+//           Also added status method to get playing tracks and reading
+//           information like the number of tracks, etc. - Manny
 
 #ifndef wavTrigger2_H
 #define wavTrigger2_H
-
-// ==================================================================
-// The following defines are used to control which serial class is
-//  used. Uncomment only the one you wish to use. If all of them are
-//  commented out, the library will use Hardware Serial
-#define __WT_USE_ALTSOFTSERIAL__
-// #define __WT_USE_SERIAL1__
-//#define __WT_USE_SERIAL2__
-//#define __WT_USE_SERIAL3__
-// ==================================================================
 
 #define CMD_GET_VERSION          1
 #define CMD_GET_SYS_INFO        2

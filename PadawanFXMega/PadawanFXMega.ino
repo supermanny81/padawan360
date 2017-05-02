@@ -1,53 +1,56 @@
-// =======================================================================================
-// /////////////////////////Padawan360 Body Code v1.0 ////////////////////////////////////
-// =======================================================================================
-/*
-  by Dan Kraus
-  dskraus@gmail.com
-  Astromech: danomite4047
+/**
+                  ~~~
+                 \_0_/
+                  | | ___---___
+                ____  ____  _______  __
+               |  _ \|___ \|  ___\ \/ /
+             / | |_) | __) | |_   \  / \
+           /   |  _ < / __/|  _|  /  \   \
+          |    |_| \_\_____|_|   /_/\_\   |
+     ___  |-------------------------------|  ___
+     |  |_|    drive and control system   |_|  | 
+     |          =====================          |
 
-  Heavily influenced by DanF's Padwan code which was built for Arduino+Wireless PS2
-  controller leveraging Bill Porter's PS2X Library. I was running into frequent disconnect
-  issues with 4 different controllers working in various capacities or not at all. I decided
-  that PS2 Controllers were going to be more difficult to come by every day, so I explored
-  some existing libraries out there to leverage and came across the USB Host Shield and it's
-  support for PS3 and Xbox 360 controllers. Bluetooth dongles were inconsistent as well
-  so I wanted to be able to have something with parts that other builder's could easily track
-  down and buy parts even at your local big box store.
+  Copyright (c) 2015 Manny Garcia, written for the R2Builders Group
 
+  Based on the execellent Padawan360 library by Dan Kraus, which was influenced by DanF's 
+  original Padawan control system. 
+  
   Hardware:
   Arduino Mega
-  USB Host Shield from circuits@home
+  USB Host Shield from circuits@home or SainSmart
   Microsoft Xbox 360 Controller
   Xbox 360 USB Wireless Reciver
   Sabertooth Motor Controller
-  Syren10en Motor Controller
+  Syren10 Motor Controller
   Sparkfun WAV Trigger
 
-  This sketch supports I2C and calls events on many sound effect actions to control lights and sounds.
-  It is NOT set up for Dan's method of using the serial packet to transfer data up to the dome
-  to trigger some light effects. If you want that, you'll need to reference DanF's original
-  Padawan code.
-
   Set Sabertooth 2x25/2x12 Dip Switches 1 and 2 Down, All Others Up
-  For Syren10en Simple Serial Set Switches 1 and 2 Down, All Others Up
+
+    Mega         ST
+    ====         ===========
+    GND <------>  0v
+    Tx1 <------>  S2
+    Rx1 <------>  S1
+
   For Syren10en Simple Serial Set Switchs 2 & 4 Down, All Others Up
-  Placed a 10K ohm resistor between S1 & GND on the Syren10en 10 itself
+
+    Mega         Syren
+    ====         ===========
+    GND <------>  0v
+    Tx2 <------>  S2
+    Rx2 <------>  S1
 
   Connect 2 wires from the UNO to the WAV Trigger's serial connector:
 
-    Uno           WAV Trigger
-    ===           ===========
-    GND  <------> GND
-    Pin9 <------> RX
-    Pin8 <------> TX (Required)
+    Mega         WAV Trigger
+    ====         ===========
+    GND <------> GND
+    Tx3 <------> RX
+    Rx3 <------> TX (Required)
 
-    I would not do this since you already have to power the USB shield, but...
-    If you want to power the WAV Trigger from the Uno, then close the 5V
-    solder jumper on the WAV Trigger and connect a 3rd wire:
-
-    5V   <------> 5V
-
+    Power the WAV trigger separately.
+    
 */
 #include <SPI.h>
 #include <Sabertooth.h>
@@ -57,7 +60,6 @@
 #include "Utility.h"
 #include "PadawanFXConfig.h"
 #include "wavTrigger2.h"
-
 
 Sabertooth Sabertooth2xXX(128, Serial1);
 Sabertooth Syren10(128, Serial2);
@@ -90,7 +92,6 @@ boolean periscopeUp = false;
 boolean periscopeRandomFast = false; //5, then 4
 boolean periscopeSearchLightCCW = false; // send 7, then 3
 
-
 USB Usb;
 XBOXRECV Xbox(&Usb);
 
@@ -113,7 +114,7 @@ void setup() {
 
   // Send the autobaud command to the Sabertooth controller(s).
   //Sabertooth2xXX.autobaud();
-  Serial1.begin(9600);
+  Serial1.begin(STBAUDRATE);
   Sabertooth2xXX.setTimeout(950);
 
   // The Sabertooth won't act on mixed mode packet serial commands until
@@ -127,7 +128,7 @@ void setup() {
   wTrig.setup(&Serial3);
   wTrig.stopAllTracks();
   printWTrigStatus();
-  setVol(vol);
+  set_volume(vol);
 }
 
 void loop() {
@@ -143,14 +144,13 @@ void loop() {
     firstLoadOnConnect = false;
     xboxBtnPressedSince = 0;
     return;
-
   }
 
   // After the controller connects, Blink all the LEDs so we know drives are disengaged at start
   if (!firstLoadOnConnect) {
     firstLoadOnConnect = true;
     isDriveEnabled = false;
-    playVoice(CONTROLLER_CONNECTED);
+    play_sound_track(CONTROLLER_CONNECTED);
     Xbox.setLedMode(ROTATING, 0);
   }
 
@@ -159,10 +159,10 @@ void loop() {
     if (isDriveEnabled) {
       isDriveEnabled = false;
       Xbox.setLedMode(ROTATING, 0);
-      playVoice(random(HUM_SND_START, HUM_SND_END));
+      play_sound_track(random(HUM_SND_START, HUM_SND_END));
     } else {
       isDriveEnabled = true;
-      playVoice(PROC_SND_START);
+      play_sound_track(PROC_SND_START);
       // //When the drive is enabled, set our LED accordingly to indicate speed
       if (drivespeed == DRIVESPEED1) {
         Xbox.setLedOn(LED1, 0);
@@ -179,41 +179,14 @@ void loop() {
     if (isInAutomationMode) {
       isInAutomationMode = false;
       automateAction = 0;
-      playVoice(PROC_SND_START);
+      play_sound_track(PROC_SND_START);
     } else {
       isInAutomationMode = true;
-      playVoice(random(PROC_SND_START + 1, PROC_SND_END));
+      play_sound_track(random(PROC_SND_START + 1, PROC_SND_END));
     }
   }
 
-  // Plays random sounds or dome movements for automations when in automation mode
-  if (isInAutomationMode) {
-    unsigned long currentMillis = millis();
-
-    if (currentMillis - automateMillis > (automateDelay * 1000)) {
-      automateMillis = millis();
-      automateAction = random(1, 5);
-
-      if (automateAction > 1) {
-        playVoice(random(AUTO_SND_START, AUTO_SND_END));
-      }
-      if (automateAction < 4) {
-        Syren10.motor(1, turnDirection);
-        delay(750);
-        Syren10.motor(1, 0);
-        if (turnDirection > 0) {
-          turnDirection = -45;
-        } else {
-          turnDirection = 45;
-        }
-      }
-      // sets the mix, max seconds between automation actions - sounds and dome movement
-      automateDelay = random(AUTO_TIME_MIN, AUTO_TIME_MAX);
-    }
-  }
-
-  // Volume Control of MP3 Trigger
-  // Hold R1 and Press Up/down on D-pad to increase/decrease volume
+  // UP on control pad
   if (Xbox.getButtonClick(UP, 0)) {
     // volume up
     if (Xbox.getButtonPress(R1, 0)) {
@@ -223,13 +196,14 @@ void loop() {
         } else {
           vol += 2;
         }
-        setVol(vol);
+        set_volume(vol);
       }
     } else if (Xbox.getButtonPress(L1, 0)) {
       send_periscope_command(6);
     }
   }
 
+  // DOWN on control pad
   if (Xbox.getButtonClick(DOWN, 0)) {
     //volume down
     if (Xbox.getButtonPress(R1, 0)) {
@@ -239,7 +213,7 @@ void loop() {
         } else {
           vol -= 2;
         }
-        setVol(vol);
+        set_volume(vol);
       }
     } else if (Xbox.getButtonPress(L1, 0)) {
       if (periscopeUp) {
@@ -255,22 +229,7 @@ void loop() {
     }
   }
 
-  if (Xbox.getButtonClick(RIGHT, 0)) {
-    //volume down
-    if (Xbox.getButtonPress(R1, 0)) {
-
-    } else if (Xbox.getButtonPress(L1, 0)) {
-      if (periscopeSearchLightCCW) {
-        // periscope up/down
-        send_periscope_command(3);
-      } else {
-        // periscope up/down
-        send_periscope_command(7);
-      }
-      periscopeSearchLightCCW = !periscopeSearchLightCCW;
-    }
-  }
-
+  // LEFT on control pad
   if (Xbox.getButtonClick(LEFT, 0)) {
     if (Xbox.getButtonPress(R1, 0)) {
 
@@ -286,82 +245,94 @@ void loop() {
     }
   }
 
-  // Logic display brightness.
-  // Hold L1 and press up/down on dpad to increase/decrease brightness
-  //  if (Xbox.getButtonClick(UP, 0)) {
-  //    if (Xbox.getButtonPress(L1, 0)) {
-  //    }
-  //  }
-  //  if (Xbox.getButtonClick(DOWN, 0)) {
-  //    if (Xbox.getButtonPress(L1, 0)) {
-  //    }
-  //  }
+  // RIGHT on control pad
+  if (Xbox.getButtonClick(RIGHT, 0)) {
+    //volume down
+    if (Xbox.getButtonPress(R1, 0)) {
 
+    } else if (Xbox.getButtonPress(L1, 0)) {
+      if (periscopeSearchLightCCW) {
+        // periscope up/down
+        send_periscope_command(3);
+      } else {
+        // periscope up/down
+        send_periscope_command(7);
+      }
+      periscopeSearchLightCCW = !periscopeSearchLightCCW;
+    }
+  }
+  
   // Y Button and Y combo buttons
   if (Xbox.getButtonClick(Y, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      playVoice(random(LEIA_SND_START, LEIA_SND_END));
+      play_sound_track(random(LEIA_SND_START, LEIA_SND_END));
     } else if (Xbox.getButtonPress(L2, 0)) {
-      playVoice(random(SCREAM_SND_START, SCREAM_SND_END));
+      play_sound_track(random(SCREAM_SND_START, SCREAM_SND_END));
     } else if (Xbox.getButtonPress(R1, 0)) {
-      playVoice(SW_SND_THEME);
+      play_sound_track(SW_SND_THEME);
     } else if (Xbox.getButtonPress(R2, 0)) {
-      playVoice(PATROL_SND);
+      play_sound_track(PATROL_SND);
     } else {
-      playVoice(random(HUM_SND_START, HUM_SND_END));
+      play_sound_track(random(HUM_SND_START, HUM_SND_END));
     }
   }
 
   // X Button and X combo Buttons
   if (Xbox.getButtonClick(X, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      playVoice(random(CHAT_SND_START, CHAT_SND_END));
+      play_sound_track(random(CHAT_SND_START, CHAT_SND_END));
     } else if (Xbox.getButtonPress(L2, 0)) {
-      playVoice(random(WHISTLE_SND_START, WHISTLE_SND_END));
+      play_sound_track(random(WHISTLE_SND_START, WHISTLE_SND_END));
     } else if (Xbox.getButtonPress(R1, 0)) {
-      playVoice(EMPIRE_SND_THEME);
+      play_sound_track(EMPIRE_SND_THEME);
     } else if (Xbox.getButtonPress(R2, 0)) {
-      playVoice(random(HOLIDAY_MUS_START, HOLIDAY_MUS_END));
+      play_sound_track(random(HOLIDAY_MUS_START, HOLIDAY_MUS_END));
     } else {
-      playVoice(random(GEN_SND_START, GEN_SND_END));
+      play_sound_track(random(GEN_SND_START, GEN_SND_END));
     }
   }
 
   // A Button and A combo Buttons
   if (Xbox.getButtonClick(A, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      playVoice(DOODOO_SND);
+      play_sound_track(DOODOO_SND);
     } else if (Xbox.getButtonPress(L2, 0)) {
-      playVoice(OVERHERE_SND);
+      play_sound_track(OVERHERE_SND);
     } else if (Xbox.getButtonPress(R1, 0)) {
-      playVoice(CANTINA_SND_THEME);
+      play_sound_track(CANTINA_SND_THEME);
     } else if (Xbox.getButtonPress(R2, 0)) {
-      playVoice(random(R2THEME_MUS_START, R2THEME_MUS_END));
+      play_sound_track(random(R2THEME_MUS_START, R2THEME_MUS_END));
     } else {
-      playVoice(random(HAPPY_SND_START, HAPPY_SND_END));
+      play_sound_track(random(HAPPY_SND_START, HAPPY_SND_END));
     }
   }
 
   // B Button and B combo Buttons
   if (Xbox.getButtonClick(B, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      playVoice(random(SAD_SND_START, SAD_SND_END));
+      play_sound_track(random(SAD_SND_START, SAD_SND_END));
     } else if (Xbox.getButtonPress(L2, 0)) {
-      playVoice(random(RANDOM_MUS_START, RANDOM_MUS_END));
+      play_sound_track(random(RANDOM_MUS_START, RANDOM_MUS_END));
     } else if (Xbox.getButtonPress(R1, 0)) {
-      playVoice(SW_CHORUS_THEME);
+      play_sound_track(SW_CHORUS_THEME);
     } else if (Xbox.getButtonPress(R2, 0)) {
-      playVoice(ANNOYED_SND);
+      play_sound_track(ANNOYED_SND);
     } else {
-      playVoice(random(PROC_SND_START, PROC_SND_END));
+      play_sound_track(random(PROC_SND_START, PROC_SND_END));
     }
+  }
+
+  // get battery levels
+  if (Xbox.getButtonClick(SYNC, 0)) {
+    Serial.print(F("Xbox (Battery: "));
+    Serial.print(Xbox.getBatteryLevel(0)); // The battery level in the range 0-3
+    Serial.println(F(")"));
   }
 
   // MOVE OUT THE WAY
   if (Xbox.getButtonClick(L3, 0))  {
-    playVoice(IMPERIAL_SIREN);
+    play_sound_track(IMPERIAL_SIREN);
   }
-
 
   // Change drivespeed if drive is eanbled
   // Press Right Analog Stick (R3)
@@ -382,10 +353,15 @@ void loop() {
       drivespeed = DRIVESPEED1;
       Xbox.setLedOn(LED1, 0);
     }
-    playVoice(PROC_SND_START);
+    play_sound_track(PROC_SND_START);
   }
 
+  drive();
+  is_disconnect();
+  automation_mode();
+}
 
+void drive() {
   // FOOT DRIVES
   // Xbox 360 analog stick values are signed 16 bit integer value
   // Sabertooth runs at 8 bit signed. -127 to 127 for speed (full speed reverse and  full speed forward)
@@ -444,33 +420,52 @@ void loop() {
     domeThrottle = 0;
   }
   Syren10.motor(1, domeThrottle);
-
-
-  proccessControllerShutdown();
-  //printControllerStatus();
-  //printThrottle();
-  //countCycles();
-} // END loop()
-
+}
 
 /**
    Determines if the controller needs to be shutdown.  The disconnect signal is sent once the XBOX
    button has been pressed for more than 3s, a rumble will indicate the controller is being shutdown.
 */
-void proccessControllerShutdown() {
+void is_disconnect() {
   if (Xbox.getButtonPress(XBOX, 0)) {
     if (xboxBtnPressedSince == 0) {
       xboxBtnPressedSince = millis();
-    } else if (millis() - xboxBtnPressedSince > 3000) {
+    } else if (millis() - xboxBtnPressedSince > 3000 && millis() - xboxBtnPressedSince < 4000) {
       Xbox.setRumbleOn(50, 127, 0);
       xboxBtnPressedSince = 0;
       Serial.print(F("Shutting down controller.  Elapsed time: "));
       Serial.println(xboxBtnPressedSince);
-      delay(500);
+    } else if (millis() - xboxBtnPressedSince > 4000) {
       Xbox.disconnect(0);
     }
   } else {
     xboxBtnPressedSince = 0;
+  }
+}
+
+void automation_mode() {
+    // Plays random sounds or dome movements for automations when in automation mode
+  if (isInAutomationMode) {
+    unsigned long currentMillis = millis();
+    if (currentMillis - automateMillis > (automateDelay * 1000)) {
+      automateMillis = millis();
+      automateAction = random(1, 5);
+      if (automateAction > 1) {
+        play_sound_track(random(AUTO_SND_START, AUTO_SND_END));
+      }
+      if (automateAction < 4) {
+        Syren10.motor(1, turnDirection);
+        delay(750);
+        Syren10.motor(1, 0);
+        if (turnDirection > 0) {
+          turnDirection = -45;
+        } else {
+          turnDirection = 45;
+        }
+      }
+      // sets the mix, max seconds between automation actions - sounds and dome movement
+      automateDelay = random(AUTO_TIME_MIN, AUTO_TIME_MAX);
+    }
   }
 }
 
@@ -492,7 +487,7 @@ void printWTrigStatus() {
   Serial.println();
 }
 
-void playVoice(int track) {
+void play_sound_track(int track) {
   wTrig.getStatus();
   uint16_t* tracks = wTrig.returnTracksPlaying();
 
@@ -519,7 +514,7 @@ void playVoice(int track) {
   wTrig.trackPlayPoly(track);
 }
 
-void setVol(int vol) {
+void set_volume(int vol) {
   Serial.print(F("Setting volume: "));
   Serial.println(vol);
   wTrig.masterGain(vol);
