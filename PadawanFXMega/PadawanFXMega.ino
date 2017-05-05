@@ -25,7 +25,7 @@
   Syren10 Motor Controller
   Sparkfun WAV Trigger
 
-  Set Sabertooth 2x25/2x12 Dip Switches 1 and 2 Down, All Others Up
+  Set Sabertooth 2x25/2x12 Dip Switches 1 and 2 Down, All Others Up (9600 baud)
 
     Mega         ST
     ====         ===========
@@ -33,7 +33,7 @@
     Tx1 <------>  S2
     Rx1 <------>  S1
 
-  For Syren10en Simple Serial Set Switchs 2 & 4 Down, All Others Up
+  For Syren10en Simple Serial Set Switchs 2 & 4 Down, All Others Up (9600 baud)
 
     Mega         Syren
     ====         ===========
@@ -57,13 +57,15 @@
 #include <SyRenSimplified.h>
 #include <Wire.h>
 #include <XBOXRECV.h>
-#include "Utility.h"
+#include <ArduinoLog.h>
+#include "Sounds.h"
 #include "PadawanFXConfig.h"
-#include "wavTrigger2.h"
+#include "Utility.h"
+#include "WavTrigger2.h"
 
 Sabertooth Sabertooth2xXX(128, Serial1);
 Sabertooth Syren10(128, Serial2);
-wavTrigger2 wTrig;
+WavTrigger2 wTrig;
 
 char vol = DEFAULT_VOLUME;
 
@@ -97,25 +99,23 @@ XBOXRECV Xbox(&Usb);
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin();
   // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
   while (!Serial);
-  Serial.println(F("PadawanFX"));
+  Wire.begin();
+  // Initialize with log level and log output. 
+  Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
+  Log.verbose(F("PadawanFX"));
 
   if (Usb.Init() == -1) {
-    Serial.println(F("\r\nOSC did not start"));
+    Log.fatal(F("\r\nOSC did not start"));
     while (1); //halt
   }
 
-  //Syren10Serial.begin(DOMEBAUDRATE);
-  //Syren10.autobaud();
   Serial2.begin(DOMEBAUDRATE);
-  Syren10.setTimeout(950);
+  Syren10.setTimeout(900);
 
-  // Send the autobaud command to the Sabertooth controller(s).
-  //Sabertooth2xXX.autobaud();
   Serial1.begin(STBAUDRATE);
-  Sabertooth2xXX.setTimeout(950);
+  Sabertooth2xXX.setTimeout(900);
 
   // The Sabertooth won't act on mixed mode packet serial commands until
   // it has received power levels for BOTH throttle and turning, since it
@@ -127,7 +127,7 @@ void setup() {
   Serial3.begin(WAVBAUDRATE);
   wTrig.setup(&Serial3);
   wTrig.stopAllTracks();
-  printWTrigStatus();
+  print_wav_info();
   set_volume(vol);
 }
 
@@ -324,9 +324,7 @@ void loop() {
 
   // get battery levels
   if (Xbox.getButtonClick(SYNC, 0)) {
-    Serial.print(F("Xbox (Battery: "));
-    Serial.print(Xbox.getBatteryLevel(0)); // The battery level in the range 0-3
-    Serial.println(F(")"));
+    Log.notice(F("Xbox Battery Level: %d"CR), Xbox.getBatteryLevel(0));
   }
 
   // MOVE OUT THE WAY
@@ -433,8 +431,7 @@ void is_disconnect() {
     } else if (millis() - xboxBtnPressedSince > 3000 && millis() - xboxBtnPressedSince < 4000) {
       Xbox.setRumbleOn(50, 127, 0);
       xboxBtnPressedSince = 0;
-      Serial.print(F("Shutting down controller.  Elapsed time: "));
-      Serial.println(xboxBtnPressedSince);
+      Log.warning(F("Shutting down controller.  Elapsed time: %d"CR), xboxBtnPressedSince);
     } else if (millis() - xboxBtnPressedSince > 4000) {
       Xbox.disconnect(0);
     }
@@ -469,22 +466,14 @@ void automation_mode() {
   }
 }
 
-void printWTrigStatus() {
+void print_wav_info() {
   wTrig.getVersion();
   uint8_t* sysVersion;
   sysVersion = wTrig.returnSysVersion();
-  Serial.print(F("Sys Version: "));
-  for (uint8_t i = 0; i < 25; i++) {
-    Serial.print(sysVersion[i], HEX);
-  }
-  Serial.println();
+  Log.notice(F("Sys Version: %x"CR), sysVersion);
   wTrig.getSysInfo();
-  Serial.print(F("Number of tracks: "));
-  Serial.print(wTrig.returnSysinfoTracks());
-  Serial.println();
-  Serial.print(F(" -- Number of voices: "));
-  Serial.print(wTrig.returnSysinfoVoices());
-  Serial.println();
+  Log.notice(F(" -- Number of tracks: %d"CR), wTrig.returnSysinfoTracks());
+  Log.notice(F(" -- Number of voices: %d"CR), wTrig.returnSysinfoVoices());
 }
 
 void play_sound_track(int track) {
@@ -496,9 +485,7 @@ void play_sound_track(int track) {
   }
 
   for (byte i = 0; i < 14; i++) {
-    Serial.print(i);
-    Serial.print(": ");
-    Serial.println(tracks[i]);
+    Log.trace(F("Background tracks [%d] : %d"CR), i, tracks[i]);
     if (tracks[i] <= BG_MUS_START) {
       wTrig.trackStop(tracks[i]);
     } else if (tracks[i] > BG_MUS_START && track > BG_MUS_START && isBgMusicPlaying == false) {
@@ -506,8 +493,7 @@ void play_sound_track(int track) {
     }
   }
 
-  Serial.print(F("Playing track: "));
-  Serial.println(track);
+  Log.notice(F("Playing track: %d"CR), track);
   if (track > BG_MUS_START && isBgMusicPlaying == false) {
     return;
   }
@@ -515,18 +501,8 @@ void play_sound_track(int track) {
 }
 
 void set_volume(int vol) {
-  Serial.print(F("Setting volume: "));
-  Serial.println(vol);
+  Log.notice(F("Setting volume: %d"CR), vol);
   wTrig.masterGain(vol);
-}
-
-void printThrottle() {
-  Serial.print(F("TURN: "));
-  Serial.print(-turnThrottle, DEC);
-  Serial.print(F(", DRIVE THROTTLE: "));
-  Serial.print(driveThrottle, DEC);
-  Serial.print(F(" DOME THROTTLE: "));
-  Serial.println(domeThrottle, DEC);
 }
 
 void send_periscope_command(byte cmd) {
@@ -541,18 +517,5 @@ void send_periscope_command(byte cmd) {
   Wire.beginTransmission(0x20); // transmit to device #20
   Wire.write(cmd); // sends one byte 0011
   Wire.endTransmission(); // stop transmitting
-  Serial.print(F("Sent command: "));
-  Serial.println(cmd, DEC);
-}
-
-void printControllerStatus() {
-  Serial.print(F("LEFT: (X="));
-  Serial.print(Xbox.getAnalogHat(LeftHatX, 0));
-  Serial.print(F(", Y="));
-  Serial.print(Xbox.getAnalogHat(LeftHatY, 0));
-  Serial.print(F("), RIGHT: (X="));
-  Serial.print(Xbox.getAnalogHat(RightHatX, 0));
-  Serial.print(F(", Y="));
-  Serial.print(Xbox.getAnalogHat(RightHatY, 0));
-  Serial.println(F(")"));
+  Log.notice(F("Sent command: %d"CR), cmd);
 }

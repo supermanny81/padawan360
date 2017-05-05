@@ -1,5 +1,5 @@
 // **************************************************************
-//     Filename: wavTrigger2.cpp
+//     Filename: WavTrigger2.cpp
 // Date Created: 2/23/2014
 //
 //     Comments: Robertsonics WAV Trigger serial control library
@@ -10,42 +10,42 @@
 
 #include "Arduino.h"
 
-#include "wavTrigger2.h"
+#include "WavTrigger2.h"
 
 // **************************************************************
-void wavTrigger2::setup(Stream* serial) {
+void WavTrigger2::setup(Stream* serial) {
   s = serial;
 }
 
 // **************************************************************
-void wavTrigger2::getVersion(void) {
-  wavTrigger2::response(CMD_GET_VERSION);
+void WavTrigger2::getVersion(void) {
+  WavTrigger2::response(CMD_GET_VERSION);
 }
-void wavTrigger2::getSysInfo(void) {
-  wavTrigger2::response(CMD_GET_SYS_INFO);
+void WavTrigger2::getSysInfo(void) {
+  WavTrigger2::response(CMD_GET_SYS_INFO);
 }
-void wavTrigger2::getStatus(void) {
-  wavTrigger2::response(CMD_GET_STATUS);
+void WavTrigger2::getStatus(void) {
+  WavTrigger2::response(CMD_GET_STATUS);
 }
 
-uint8_t* wavTrigger2::returnSysVersion(void) {
+uint8_t* WavTrigger2::returnSysVersion(void) {
   return sysVersion;
 }
-uint8_t wavTrigger2::returnSysinfoVoices(void) {
+uint8_t WavTrigger2::returnSysinfoVoices(void) {
   return sysinfoVoices;
 }
-uint16_t wavTrigger2::returnSysinfoTracks(void) {
+uint16_t WavTrigger2::returnSysinfoTracks(void) {
   return sysinfoTracks;
 }
-uint8_t wavTrigger2::returnTracksPlayingCount(void) {
+uint8_t WavTrigger2::returnTracksPlayingCount(void) {
   return tracksPlayingCount;
 }
-uint16_t* wavTrigger2::returnTracksPlaying(void) {
+uint16_t* WavTrigger2::returnTracksPlaying(void) {
   return tracksPlaying;
 }
 
 // **************************************************************
-void wavTrigger2::response(uint8_t responseCommand) {
+void WavTrigger2::response(uint8_t responseCommand) {
 
     s->flush();
     //s->clear();
@@ -59,11 +59,11 @@ void wavTrigger2::response(uint8_t responseCommand) {
     txbuf[4] = EOM;
     s->write(txbuf, 5);
 
-    wavTrigger2::readResponse(2000);
+    WavTrigger2::readResponse(2000);
 }
 
 // **************************************************************
-void wavTrigger2::readResponse(unsigned long wait) {
+void WavTrigger2::readResponse(unsigned long wait) {
 
   unsigned long stop = millis() + wait;
   while (
@@ -93,7 +93,7 @@ void wavTrigger2::readResponse(unsigned long wait) {
       packet[i] == EOM
     ) {
       // good packet! run trough parser
-      wavTrigger2::parseResponse();
+      WavTrigger2::parseResponse();
     } else {
       // bad packet!
     }
@@ -103,7 +103,7 @@ void wavTrigger2::readResponse(unsigned long wait) {
 }
 
 // **************************************************************
-void wavTrigger2::parseResponse() {
+void WavTrigger2::parseResponse() {
   int8_t dataBytesCount = packet[2] - 5;
   switch (packet[3]) {
 
@@ -136,7 +136,7 @@ void wavTrigger2::parseResponse() {
 }
 
 // **************************************************************
-void wavTrigger2::masterGain(int gain) {
+void WavTrigger2::masterGain(int gain) {
 
 uint8_t txbuf[8];
 unsigned short vol;
@@ -153,43 +153,43 @@ unsigned short vol;
 }
 
 // **************************************************************
-void wavTrigger2::trackPlaySolo(int trk) {
+void WavTrigger2::trackPlaySolo(int trk) {
 
   trackControl(trk, TRK_PLAY_SOLO);
 }
 
 // **************************************************************
-void wavTrigger2::trackPlayPoly(int trk) {
+void WavTrigger2::trackPlayPoly(int trk) {
 
   trackControl(trk, TRK_PLAY_POLY);
 }
 
 // **************************************************************
-void wavTrigger2::trackLoad(int trk) {
+void WavTrigger2::trackLoad(int trk) {
 
   trackControl(trk, TRK_LOAD);
 }
 
 // **************************************************************
-void wavTrigger2::trackStop(int trk) {
+void WavTrigger2::trackStop(int trk) {
 
   trackControl(trk, TRK_STOP);
 }
 
 // **************************************************************
-void wavTrigger2::trackPause(int trk) {
+void WavTrigger2::trackPause(int trk) {
 
   trackControl(trk, TRK_PAUSE);
 }
 
 // **************************************************************
-void wavTrigger2::trackResume(int trk) {
+void WavTrigger2::trackResume(int trk) {
 
   trackControl(trk, TRK_RESUME);
 }
 
 // **************************************************************
-void wavTrigger2::trackLoop(int trk, bool enable) {
+void WavTrigger2::trackLoop(int trk, bool enable) {
 
   if (enable)
     trackControl(trk, TRK_LOOP_ON);
@@ -198,7 +198,7 @@ void wavTrigger2::trackLoop(int trk, bool enable) {
 }
 
 // **************************************************************
-void wavTrigger2::trackControl(int trk, int code) {
+void WavTrigger2::trackControl(int trk, int code) {
 
   uint8_t txbuf[8];
 
@@ -214,7 +214,7 @@ void wavTrigger2::trackControl(int trk, int code) {
 }
 
 // **************************************************************
-void wavTrigger2::stopAllTracks(void) {
+void WavTrigger2::stopAllTracks(void) {
 
   uint8_t txbuf[5];
 
@@ -227,7 +227,7 @@ void wavTrigger2::stopAllTracks(void) {
 }
 
 // **************************************************************
-void wavTrigger2::resumeAllInSync(void) {
+void WavTrigger2::resumeAllInSync(void) {
 
   uint8_t txbuf[5];
 
@@ -240,7 +240,7 @@ void wavTrigger2::resumeAllInSync(void) {
 }
 
 // **************************************************************
-void wavTrigger2::trackGain(int trk, int gain) {
+void WavTrigger2::trackGain(int trk, int gain) {
 
   uint8_t txbuf[9];
   unsigned short vol;
@@ -259,7 +259,7 @@ void wavTrigger2::trackGain(int trk, int gain) {
 }
 
 // **************************************************************
-void wavTrigger2::trackFade(int trk, int gain, int time, bool stopFlag) {
+void WavTrigger2::trackFade(int trk, int gain, int time, bool stopFlag) {
 
   uint8_t txbuf[12];
   unsigned short vol;
@@ -281,7 +281,7 @@ void wavTrigger2::trackFade(int trk, int gain, int time, bool stopFlag) {
 }
 
 // **************************************************************
-void wavTrigger2::trackCrossFade(int trkFrom, int trkTo, int gain, int time) {
+void WavTrigger2::trackCrossFade(int trkFrom, int trkTo, int gain, int time) {
 
   uint8_t txbuf[12];
   unsigned short vol;
@@ -324,7 +324,7 @@ void wavTrigger2::trackCrossFade(int trkFrom, int trkTo, int gain, int time) {
 }
 
 // **************************************************************
-void wavTrigger2::samplerateOffset(int offset) {
+void WavTrigger2::samplerateOffset(int offset) {
 
   uint8_t txbuf[8];
   unsigned short off;

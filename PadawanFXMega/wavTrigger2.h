@@ -29,8 +29,8 @@
 //           Also added status method to get playing tracks and reading
 //           information like the number of tracks, etc. - Manny
 
-#ifndef wavTrigger2_H
-#define wavTrigger2_H
+#ifndef wavTrigger2_H_
+#define wavTrigger2_H_
 
 #define CMD_GET_VERSION          1
 #define CMD_GET_SYS_INFO        2
@@ -60,11 +60,11 @@
 #define HEAD_2                  0xaa
 #define EOM                     0x55
 
-class wavTrigger2
+class WavTrigger2
 {
 public:
-  wavTrigger2() {;}
-  ~wavTrigger2() {;}
+  WavTrigger2() {;}
+  ~WavTrigger2() {;}
 
   void setup(Stream* serial);
   void masterGain(int gain);
@@ -111,4 +111,4 @@ private:
 
 };
 
-#endif
+#endif // wavTrigger2_H_

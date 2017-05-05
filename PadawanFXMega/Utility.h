@@ -1,3 +1,5 @@
+#include <ArduinoLog.h>
+
 int freeRam () {
   extern int __heap_start, *__brkval;
   int v;
@@ -6,16 +8,19 @@ int freeRam () {
 
 long time = 0;
 int cycles = 0;
+long interval = 1000;
+
+void setTime(long time) {
+  time = time + interval;
+}
 
 void countCycles() {
-  if (millis() - time > 1000) {
-    Serial.print(cycles);
-    Serial.println(F("cycles processed in 1s"));
-    time = millis();
+  if (millis() > time) {
+    cycles++;
+    Log.notice(F("%d cycles processed in ~%d millis."CR), cycles, interval);
+    setTime(millis());
     cycles = 1;
   } else {
     cycles++;
   }
 }
-
-
