@@ -8,14 +8,12 @@
            /   |  _ < / __/|  _|  /  \   \
           |    |_| \_\_____|_|   /_/\_\   |
      ___  |-------------------------------|  ___
-     |  |_|    drive and control system   |_|  | 
+     |  |_|    drive and control system   |_|  |
      |          =====================          |
 
-  Copyright (c) 2015 Manny Garcia, written for the R2Builders Group
+  Based on the execellent Padawan360 sketch by Dan Kraus, which was influenced by DanF's
+  original Padawan control system.
 
-  Based on the execellent Padawan360 library by Dan Kraus, which was influenced by DanF's 
-  original Padawan control system. 
-  
   Hardware:
   Arduino Mega
   USB Host Shield from circuits@home or SainSmart
@@ -50,7 +48,7 @@
     Rx3 <------> TX (Required)
 
     Power the WAV trigger separately.
-    
+
 */
 #include <SPI.h>
 #include <Sabertooth.h>
@@ -102,7 +100,7 @@ void setup() {
   // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
   while (!Serial);
   Wire.begin();
-  // Initialize with log level and log output. 
+  // Initialize with log level and log output.
   Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
   Log.verbose(F("PadawanFX"));
 
@@ -116,6 +114,12 @@ void setup() {
 
   Serial1.begin(STBAUDRATE);
   Sabertooth2xXX.setTimeout(900);
+  
+  //change current baud rate to 19200L
+  //Syren10.setBaudRate(19200L);
+  //Serial2.begin(19200L);
+  //Sabertooth2xXX.setBaudRate(19200L);
+  //Serial1.begin(19200L);
 
   // The Sabertooth won't act on mixed mode packet serial commands until
   // it has received power levels for BOTH throttle and turning, since it
@@ -132,6 +136,8 @@ void setup() {
 }
 
 void loop() {
+  // used in testing, keeps track of the number of cycles being run
+  //countCycles();
   Usb.Task();
 
   //if we're not connected, return so we don't bother doing anything else.
@@ -261,7 +267,7 @@ void loop() {
       periscopeSearchLightCCW = !periscopeSearchLightCCW;
     }
   }
-  
+
   // Y Button and Y combo buttons
   if (Xbox.getButtonClick(Y, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
@@ -323,7 +329,7 @@ void loop() {
   }
 
   // get battery levels
-  if (Xbox.getButtonClick(SYNC, 0)) {
+  if (Xbox.getButtonClick(XBOX, 0)) {
     Log.notice(F("Xbox Battery Level: %d"CR), Xbox.getBatteryLevel(0));
   }
 
@@ -362,33 +368,28 @@ void loop() {
 void drive() {
   // FOOT DRIVES
   // Xbox 360 analog stick values are signed 16 bit integer value
-  // Sabertooth runs at 8 bit signed. -127 to 127 for speed (full speed reverse and  full speed forward)
+  // Sabertooth runs at 8 bit signed. -127 to 127 for speed (full speed reverse and full speed forward)
   // Map the 360 stick values to our min/max current drive speed
-  if (Xbox.getAnalogHat(RightHatY, 0) > RIGHT_HAT_Y_NEUTRAL || Xbox.getAnalogHat(RightHatY, 0) < -RIGHT_HAT_Y_NEUTRAL) {
+  if (abs((long) Xbox.getAnalogHat(RightHatY, 0)) > RIGHT_HAT_Y_NEUTRAL) {
     sticknum = (map(Xbox.getAnalogHat(RightHatY, 0), -32768, 32767, -drivespeed, drivespeed));
-    if (sticknum > -DRIVEDEADZONERANGE && sticknum < DRIVEDEADZONERANGE) {
-      // stick is in dead zone - don't drive
-      driveThrottle = 0;
-    } else {
-      if (driveThrottle < sticknum) {
-        if (sticknum - driveThrottle < (RAMPING + 1) ) {
-          driveThrottle += RAMPING;
-        } else {
-          driveThrottle = sticknum;
-        }
-      } else if (driveThrottle > sticknum) {
-        if (driveThrottle - sticknum < (RAMPING + 1) ) {
-          driveThrottle -= RAMPING;
-        } else {
-          driveThrottle = sticknum;
-        }
+    if (driveThrottle < sticknum) {
+      if (sticknum - driveThrottle < (RAMPING + 1) ) {
+        driveThrottle += RAMPING;
+      } else {
+        driveThrottle = sticknum;
+      }
+    } else if (driveThrottle > sticknum) {
+      if (driveThrottle - sticknum < (RAMPING + 1) ) {
+        driveThrottle -= RAMPING;
+      } else {
+        driveThrottle = sticknum;
       }
     }
   } else {
     driveThrottle = 0;
   }
 
-  if (Xbox.getAnalogHat(RightHatX, 0) > RIGHT_HAT_X_NEUTRAL || Xbox.getAnalogHat(RightHatX, 0) < -RIGHT_HAT_X_NEUTRAL) {
+  if (abs((long) Xbox.getAnalogHat(RightHatX, 0)) > RIGHT_HAT_X_NEUTRAL) {
     turnThrottle = map(Xbox.getAnalogHat(RightHatX, 0), -32768, 32767, -TURNSPEED, TURNSPEED);
   } else {
     turnThrottle = 0;
@@ -397,23 +398,13 @@ void drive() {
   // DRIVE!
   // right stick (drive)
   if (isDriveEnabled) {
-    // Only do deadzone check for turning here. Our Drive throttle speed has some math applied
-    // for RAMPING and stuff, so just keep it separate here
-    if (turnThrottle > -DRIVEDEADZONERANGE && turnThrottle < DRIVEDEADZONERANGE) {
-      // stick is in dead zone - don't turn
-      turnThrottle = 0;
-    }
     Sabertooth2xXX.turn(turnThrottle);
     Sabertooth2xXX.drive(driveThrottle);
   }
 
   // DOME DRIVE!
-  if (Xbox.getAnalogHat(LeftHatX, 0) > LEFT_HAT_X_NEUTRAL || Xbox.getAnalogHat(LeftHatX, 0) < -LEFT_HAT_X_NEUTRAL) {
+  if (abs((long) Xbox.getAnalogHat(LeftHatX, 0)) > LEFT_HAT_X_NEUTRAL) {
     domeThrottle = (map(Xbox.getAnalogHat(LeftHatX, 0), -32768, 32767, -DOMESPEED, DOMESPEED));
-    if (domeThrottle > -DOMEDEADZONERANGE && domeThrottle < DOMEDEADZONERANGE) {
-      //stick in dead zone - don't spin dome
-      domeThrottle = 0;
-    }
   } else {
     domeThrottle = 0;
   }
@@ -428,12 +419,12 @@ void is_disconnect() {
   if (Xbox.getButtonPress(XBOX, 0)) {
     if (xboxBtnPressedSince == 0) {
       xboxBtnPressedSince = millis();
-    } else if (millis() - xboxBtnPressedSince > 3000 && millis() - xboxBtnPressedSince < 4000) {
+    } else if (millis() - xboxBtnPressedSince >= 1800 && millis() - xboxBtnPressedSince < 2100) {
       Xbox.setRumbleOn(50, 127, 0);
+      Log.warning(F("Shutting down controller.  Elapsed time: %d"CR), millis() - xboxBtnPressedSince);
+    } else if (millis() - xboxBtnPressedSince >= 2100) {
       xboxBtnPressedSince = 0;
-      Log.warning(F("Shutting down controller.  Elapsed time: %d"CR), xboxBtnPressedSince);
-    } else if (millis() - xboxBtnPressedSince > 4000) {
-      Xbox.disconnect(0);
+      Xbox.disconnect(0); 
     }
   } else {
     xboxBtnPressedSince = 0;
@@ -441,7 +432,7 @@ void is_disconnect() {
 }
 
 void automation_mode() {
-    // Plays random sounds or dome movements for automations when in automation mode
+  // Plays random sounds or dome movements for automations when in automation mode
   if (isInAutomationMode) {
     unsigned long currentMillis = millis();
     if (currentMillis - automateMillis > (automateDelay * 1000)) {
@@ -514,8 +505,9 @@ void send_periscope_command(byte cmd) {
   // 5: RANDOM - SLOW
   // 6: DAGOBAH - WHITE LIGHTS - FACE FORWARD
   // 7: SEARCHLIGHT CW
-  Wire.beginTransmission(0x20); // transmit to device #20
+  byte dev_address = 0x20;
+  Wire.beginTransmission(dev_address); // transmit to device #20
   Wire.write(cmd); // sends one byte 0011
   Wire.endTransmission(); // stop transmitting
-  Log.notice(F("Sent command: %d"CR), cmd);
+  Log.notice(F("Sent command: %d to device ID: %d"CR), cmd, dev_address);
 }

@@ -6,12 +6,12 @@ int freeRam () {
   return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
 
-long time = 0;
+long time = 0L;
 int cycles = 0;
-long interval = 1000;
+long interval = 1000L;
 
-void setTime(long time) {
-  time = time + interval;
+void setTime(long t) {
+  time = t + interval;
 }
 
 void countCycles() {
