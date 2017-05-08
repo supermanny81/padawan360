@@ -32,7 +32,7 @@ void TimedServos::setServoPosition(uint8_t board, uint8_t channel, uint8_t srvPo
     srvPos = map( srvPos, 0, 127, 127, 0);
 
   // makes sure we don't attempt to make the servos travel faster than possible
-  uint16_t min_travel_time = abs(servoBoards[board].channels[channel].currPos - srvPos) * PWM_MAX_TRAVEL_PER_MILLI;
+  uint16_t min_travel_time = abs(servoBoards[board].channels[channel].currPos - srvPos) / PWM_MAX_TRAVEL_PER_MILLI;
   timeAllotted = (min_travel_time > timeAllotted) ? min_travel_time : timeAllotted;
   // set the position and time to reach it
   servoBoards[board].channels[channel].startPos = servoBoards[board].channels[channel].currPos;
@@ -77,4 +77,3 @@ void TimedServos::loop() {
     }
   }
 }
-

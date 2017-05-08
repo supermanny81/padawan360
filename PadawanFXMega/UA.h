@@ -14,13 +14,13 @@
 #define SV_UA_BOARD 1
 #define SV_UA_TOP 0
 #define SV_UA_IS_INVERSED true
-#define SV_UA_TOP_MIN 150
-#define SV_UA_TOP_MAX 600
+#define SV_UA_TOP_MIN 280
+#define SV_UA_TOP_MAX 510
 
 #define SV_UA_BOTTOM 1
 #define SV_UA_BOTTOM_IS_INVERSED true
-#define SV_UA_BOTTOM_MIN 150
-#define SV_UA_BOTTOM_MAX 600
+#define SV_UA_BOTTOM_MIN 300
+#define SV_UA_BOTTOM_MAX 550
 
 class UA {
 

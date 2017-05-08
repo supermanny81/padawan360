@@ -31,8 +31,6 @@ byte drivespeed = DRIVESPEED1;
 // Recommend beginner: 40 to 50, experienced: 50 $ up, I like 70
 const byte TURNSPEED = 70;
 
-// If using a speed controller for the dome, sets the top speed. You'll want to vary it potenitally
-// depending on your motor. My Pittman is really fast so I dial this down a ways from top speed.
 // Use a number up to 127 for serial
 const byte DOMESPEED = 127;
 
@@ -43,5 +41,11 @@ const byte RAMPING = 4;
 //************************* Automation Settings *****************************//
 #define AUTO_TIME_MIN 5
 #define AUTO_TIME_MAX 20
+
+// a 4S pack should go up to 4*4.2V = 16.8V at full charge and go down to no less than 4*3.2V = 12.8V at full discharge
+#define MIN_VOLTAGE 12.8
+#define MAX_VOLTAGE 16.8
+// volt = (analogRead(A0) / 1024.) * 25;
+// map(volt, 12.8, 16.8, 0, 100);
 
 #endif //PADAWAN_FX_CONFIG_H_

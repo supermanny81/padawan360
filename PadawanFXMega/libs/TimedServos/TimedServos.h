@@ -17,7 +17,7 @@
 #include "Wire.h"
 #include "Adafruit_PWMServoDriver.h"
 
-#define PWM_MAX_TRAVEL_PER_MILLI .5
+#define PWM_MAX_TRAVEL_PER_MILLI 5
 
 class TimedServos {
 
