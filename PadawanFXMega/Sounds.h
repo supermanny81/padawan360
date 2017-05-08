@@ -1,5 +1,5 @@
-#ifndef SOUNDS_H
-#define SOUNDS_H
+#ifndef SOUNDS_H_
+#define SOUNDS_H_
 //************************* Sound Settings *****************************//
 #define WAVBAUDRATE 57600
 // 0 = full volume, 255 off (after 64 inaudible) <== mp3Triger

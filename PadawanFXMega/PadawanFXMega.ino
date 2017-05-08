@@ -31,7 +31,7 @@
     Tx1 <------>  S2
     Rx1 <------>  S1
 
-  For Syren10en Simple Serial Set Switchs 2 & 4 Down, All Others Up (9600 baud)
+  For Syren10en Packetized Serial Set Switchs 1 & 2 Down, All Others Up (9600 baud)
 
     Mega         Syren
     ====         ===========
@@ -50,7 +50,6 @@
     Power the WAV trigger separately.
 
 */
-#include <SPI.h>
 #include <Sabertooth.h>
 #include <SyRenSimplified.h>
 #include <Wire.h>
@@ -58,8 +57,15 @@
 #include <ArduinoLog.h>
 #include "Sounds.h"
 #include "PadawanFXConfig.h"
+#include "UA.h"
 #include "Utility.h"
-#include "WavTrigger2.h"
+
+// need to include headers and impl in the ino to get around Arduino IDE compile issues
+#include "libs/TimedServos/TimedServos.h"
+#include "libs/TimedServos/TimedServos.cpp"
+#include "libs/WavTrigger2/WavTrigger2.h"
+#include "libs/WavTrigger2/WavTrigger2.cpp"
+
 
 Sabertooth Sabertooth2xXX(128, Serial1);
 Sabertooth Syren10(128, Serial2);
@@ -94,12 +100,16 @@ boolean periscopeSearchLightCCW = false; // send 7, then 3
 
 USB Usb;
 XBOXRECV Xbox(&Usb);
+TimedServos* ts = TimedServos::getInstance();
+UA* ua = UA::getInstance();
 
 void setup() {
   Serial.begin(115200);
   // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
   while (!Serial);
   Wire.begin();
+  // use fast IIC
+  //TWBR = 12; // upgrade to 400KHz!
   // Initialize with log level and log output.
   Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
   Log.verbose(F("PadawanFX"));
@@ -133,11 +143,12 @@ void setup() {
   wTrig.stopAllTracks();
   print_wav_info();
   set_volume(vol);
+  ts->setup();
 }
 
 void loop() {
   // used in testing, keeps track of the number of cycles being run
-  //countCycles();
+  countCycles();
   Usb.Task();
 
   //if we're not connected, return so we don't bother doing anything else.
@@ -206,6 +217,9 @@ void loop() {
       }
     } else if (Xbox.getButtonPress(L1, 0)) {
       send_periscope_command(6);
+    } else {
+      // open utility arms
+      ua->open_all();
     }
   }
 
@@ -232,6 +246,9 @@ void loop() {
         send_periscope_command(2);
       }
       periscopeUp = !periscopeUp;
+    } else {
+      // close utility arms
+      ua->close_all();
     }
   }
 
@@ -248,6 +265,9 @@ void loop() {
         send_periscope_command(5);
       }
       periscopeRandomFast = !periscopeRandomFast;
+    } else {
+      // toggle upper arm
+      ua->toggle_upper();
     }
   }
 
@@ -265,6 +285,9 @@ void loop() {
         send_periscope_command(7);
       }
       periscopeSearchLightCCW = !periscopeSearchLightCCW;
+    } else {
+      // toggle upper arm
+      ua->toggle_lower();
     }
   }
 
@@ -363,6 +386,7 @@ void loop() {
   drive();
   is_disconnect();
   automation_mode();
+  ts->loop();
 }
 
 void drive() {
