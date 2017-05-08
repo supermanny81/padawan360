@@ -112,10 +112,10 @@ void setup() {
   //TWBR = 12; // upgrade to 400KHz!
   // Initialize with log level and log output.
   Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
-  Log.verbose(F("PadawanFX"));
+  Log.verbose(F("PadawanFX"CR));
 
   if (Usb.Init() == -1) {
-    Log.fatal(F("\r\nOSC did not start"));
+    Log.fatal(F("\r\nOSC did not start"CR));
     while (1); //halt
   }
 
