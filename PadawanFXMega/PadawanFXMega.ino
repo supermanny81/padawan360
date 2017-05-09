@@ -55,23 +55,21 @@
 #include <Wire.h>
 #include <XBOXRECV.h>
 #include <ArduinoLog.h>
+#include "Periscope.h"
 #include "Sounds.h"
+#include "TrackConfig.h"
 #include "PadawanFXConfig.h"
 #include "UA.h"
-#include "Utility.h"
 
 // need to include headers and impl in the ino to get around Arduino IDE compile issues
+#include "libs/ArduinoUtil/ArduinoUtil.h"
 #include "libs/TimedServos/TimedServos.h"
 #include "libs/TimedServos/TimedServos.cpp"
 #include "libs/WavTrigger2/WavTrigger2.h"
 #include "libs/WavTrigger2/WavTrigger2.cpp"
 
-
 Sabertooth Sabertooth2xXX(128, Serial1);
 Sabertooth Syren10(128, Serial2);
-WavTrigger2 wTrig;
-
-char vol = DEFAULT_VOLUME;
 
 // 0 = drive motors off ( right stick disabled ) at start
 boolean isDriveEnabled = false;
@@ -79,7 +77,6 @@ boolean isDriveEnabled = false;
 // Automated function variables
 // Used as a boolean to turn on/off automated functions like periodic random sounds and periodic dome turns
 boolean isInAutomationMode = false;
-boolean isBgMusicPlaying = false;
 unsigned long automateMillis = 0;
 byte automateDelay = random(5, 20); // set this to min and max seconds between sounds
 
@@ -94,12 +91,12 @@ char domeThrottle = 0;
 char turnThrottle = 0;
 long xboxBtnPressedSince = 0;
 boolean firstLoadOnConnect = false;
-boolean periscopeUp = false;
-boolean periscopeRandomFast = false; //5, then 4
-boolean periscopeSearchLightCCW = false; // send 7, then 3
 
+ArduinoUtil util = ArduinoUtil();
 USB Usb;
 XBOXRECV Xbox(&Usb);
+Periscope* periscope = Periscope::getInstance();
+Sounds* sound = Sounds::getInstance();
 TimedServos* ts = TimedServos::getInstance();
 UA* ua = UA::getInstance();
 
@@ -107,9 +104,6 @@ void setup() {
   Serial.begin(115200);
   // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
   while (!Serial);
-  Wire.begin();
-  // use fast IIC
-  //TWBR = 12; // upgrade to 400KHz!
   // Initialize with log level and log output.
   Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
   Log.verbose(F("PadawanFX"CR));
@@ -119,17 +113,12 @@ void setup() {
     while (1); //halt
   }
 
-  Serial2.begin(DOMEBAUDRATE);
-  Syren10.setTimeout(900);
-
   Serial1.begin(STBAUDRATE);
   Sabertooth2xXX.setTimeout(900);
-  
-  //change current baud rate to 19200L
-  //Syren10.setBaudRate(19200L);
-  //Serial2.begin(19200L);
-  //Sabertooth2xXX.setBaudRate(19200L);
-  //Serial1.begin(19200L);
+  Serial2.begin(DOMEBAUDRATE);
+  Syren10.setTimeout(900);
+  Serial3.begin(WAVBAUDRATE);
+  sound->setup(&Serial3);
 
   // The Sabertooth won't act on mixed mode packet serial commands until
   // it has received power levels for BOTH throttle and turning, since it
@@ -137,18 +126,19 @@ void setup() {
   Sabertooth2xXX.drive(0);
   Sabertooth2xXX.turn(0);
 
-  // WAV Trigger startup
-  Serial3.begin(WAVBAUDRATE);
-  wTrig.setup(&Serial3);
-  wTrig.stopAllTracks();
-  print_wav_info();
-  set_volume(vol);
+  // let the connected i2c slaves initialize
+  delay(1000);
+  
+  Wire.begin();
+  // use fast IIC
+  TWBR = 12; // upgrade to 400KHz!
   ts->setup();
+  ua->setup();
 }
 
 void loop() {
   // used in testing, keeps track of the number of cycles being run
-  countCycles();
+  util.countCycles();
   Usb.Task();
 
   //if we're not connected, return so we don't bother doing anything else.
@@ -167,7 +157,7 @@ void loop() {
   if (!firstLoadOnConnect) {
     firstLoadOnConnect = true;
     isDriveEnabled = false;
-    play_sound_track(CONTROLLER_CONNECTED);
+    sound->play(CONTROLLER_CONNECTED);
     Xbox.setLedMode(ROTATING, 0);
   }
 
@@ -176,10 +166,10 @@ void loop() {
     if (isDriveEnabled) {
       isDriveEnabled = false;
       Xbox.setLedMode(ROTATING, 0);
-      play_sound_track(random(HUM_SND_START, HUM_SND_END));
+      sound->play(random(HUM_SND_START, HUM_SND_END));
     } else {
       isDriveEnabled = true;
-      play_sound_track(PROC_SND_START);
+      sound->play(PROC_SND_START);
       // //When the drive is enabled, set our LED accordingly to indicate speed
       if (drivespeed == DRIVESPEED1) {
         Xbox.setLedOn(LED1, 0);
@@ -196,10 +186,10 @@ void loop() {
     if (isInAutomationMode) {
       isInAutomationMode = false;
       automateAction = 0;
-      play_sound_track(PROC_SND_START);
+      sound->play(PROC_SND_START);
     } else {
       isInAutomationMode = true;
-      play_sound_track(random(PROC_SND_START + 1, PROC_SND_END));
+      sound->play(random(PROC_SND_START + 1, PROC_SND_END));
     }
   }
 
@@ -207,19 +197,11 @@ void loop() {
   if (Xbox.getButtonClick(UP, 0)) {
     // volume up
     if (Xbox.getButtonPress(R1, 0)) {
-      if (vol < DEFAULT_VOLUME_MAX) {
-        if (vol > DEFAULT_VOLUME_MAX - 3) {
-          vol++;
-        } else {
-          vol += 2;
-        }
-        set_volume(vol);
-      }
+      sound->volUp();
     } else if (Xbox.getButtonPress(L1, 0)) {
-      send_periscope_command(6);
+      periscope->dagobah();
     } else {
-      // open utility arms
-      ua->open_all();
+      ua->openAll();
     }
   }
 
@@ -227,28 +209,11 @@ void loop() {
   if (Xbox.getButtonClick(DOWN, 0)) {
     //volume down
     if (Xbox.getButtonPress(R1, 0)) {
-      if (vol > DEFAULT_VOLUME_MIN) {
-        if (vol < DEFAULT_VOLUME_MIN - 3) {
-          vol--;
-        } else {
-          vol -= 2;
-        }
-        set_volume(vol);
-      }
+      sound->volDown();
     } else if (Xbox.getButtonPress(L1, 0)) {
-      if (periscopeUp) {
-        // periscope down
-        send_periscope_command(1);
-        periscopeSearchLightCCW = false;
-        periscopeRandomFast =  false;
-      } else {
-        // periscope up/down
-        send_periscope_command(2);
-      }
-      periscopeUp = !periscopeUp;
+      periscope->toggleUpDown();
     } else {
-      // close utility arms
-      ua->close_all();
+      ua->closeAll();
     }
   }
 
@@ -257,17 +222,9 @@ void loop() {
     if (Xbox.getButtonPress(R1, 0)) {
 
     } else if (Xbox.getButtonPress(L1, 0)) {
-      if (periscopeRandomFast) {
-        // periscope up/down
-        send_periscope_command(4);
-      } else {
-        // periscope up/down
-        send_periscope_command(5);
-      }
-      periscopeRandomFast = !periscopeRandomFast;
+      periscope->toggleRandom();
     } else {
-      // toggle upper arm
-      ua->toggle_upper();
+      ua->toggleUpper();
     }
   }
 
@@ -275,79 +232,71 @@ void loop() {
   if (Xbox.getButtonClick(RIGHT, 0)) {
     //volume down
     if (Xbox.getButtonPress(R1, 0)) {
-
+      //Nothing, yet?
     } else if (Xbox.getButtonPress(L1, 0)) {
-      if (periscopeSearchLightCCW) {
-        // periscope up/down
-        send_periscope_command(3);
-      } else {
-        // periscope up/down
-        send_periscope_command(7);
-      }
-      periscopeSearchLightCCW = !periscopeSearchLightCCW;
+      periscope->toggleSearchMode();
     } else {
-      // toggle upper arm
-      ua->toggle_lower();
+      ua->toggleLower();
     }
   }
 
   // Y Button and Y combo buttons
   if (Xbox.getButtonClick(Y, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      play_sound_track(random(LEIA_SND_START, LEIA_SND_END));
+      sound->play(random(LEIA_SND_START, LEIA_SND_END));
     } else if (Xbox.getButtonPress(L2, 0)) {
-      play_sound_track(random(SCREAM_SND_START, SCREAM_SND_END));
+      sound->play(random(SCREAM_SND_START, SCREAM_SND_END));
     } else if (Xbox.getButtonPress(R1, 0)) {
-      play_sound_track(SW_SND_THEME);
+      sound->play(SW_SND_THEME);
     } else if (Xbox.getButtonPress(R2, 0)) {
-      play_sound_track(PATROL_SND);
+      sound->play(PATROL_SND);
     } else {
-      play_sound_track(random(HUM_SND_START, HUM_SND_END));
+      sound->play(random(HUM_SND_START, HUM_SND_END));
     }
   }
 
   // X Button and X combo Buttons
   if (Xbox.getButtonClick(X, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      play_sound_track(random(CHAT_SND_START, CHAT_SND_END));
+      sound->play(random(CHAT_SND_START, CHAT_SND_END));
     } else if (Xbox.getButtonPress(L2, 0)) {
-      play_sound_track(random(WHISTLE_SND_START, WHISTLE_SND_END));
+      sound->play(random(WHISTLE_SND_START, WHISTLE_SND_END));
     } else if (Xbox.getButtonPress(R1, 0)) {
-      play_sound_track(EMPIRE_SND_THEME);
+      sound->play(EMPIRE_SND_THEME);
     } else if (Xbox.getButtonPress(R2, 0)) {
-      play_sound_track(random(HOLIDAY_MUS_START, HOLIDAY_MUS_END));
+      sound->play(random(HOLIDAY_MUS_START, HOLIDAY_MUS_END));
     } else {
-      play_sound_track(random(GEN_SND_START, GEN_SND_END));
+      sound->play(random(GEN_SND_START, GEN_SND_END));
     }
   }
 
   // A Button and A combo Buttons
   if (Xbox.getButtonClick(A, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      play_sound_track(DOODOO_SND);
+      sound->play(DOODOO_SND);
     } else if (Xbox.getButtonPress(L2, 0)) {
-      play_sound_track(OVERHERE_SND);
+      sound->play(OVERHERE_SND);
     } else if (Xbox.getButtonPress(R1, 0)) {
-      play_sound_track(CANTINA_SND_THEME);
+      sound->play(CANTINA_SND_THEME);
     } else if (Xbox.getButtonPress(R2, 0)) {
-      play_sound_track(random(R2THEME_MUS_START, R2THEME_MUS_END));
+      sound->play(random(R2THEME_MUS_START, R2THEME_MUS_END));
     } else {
-      play_sound_track(random(HAPPY_SND_START, HAPPY_SND_END));
+      sound->play(random(HAPPY_SND_START, HAPPY_SND_END));
     }
   }
 
   // B Button and B combo Buttons
   if (Xbox.getButtonClick(B, 0)) {
     if (Xbox.getButtonPress(L1, 0)) {
-      play_sound_track(random(SAD_SND_START, SAD_SND_END));
+      sound->play(random(SAD_SND_START, SAD_SND_END));
     } else if (Xbox.getButtonPress(L2, 0)) {
-      play_sound_track(random(RANDOM_MUS_START, RANDOM_MUS_END));
+      sound->play(random(RANDOM_MUS_START, RANDOM_MUS_END));
     } else if (Xbox.getButtonPress(R1, 0)) {
-      play_sound_track(SW_CHORUS_THEME);
+      sound->play(SW_CHORUS_THEME);
     } else if (Xbox.getButtonPress(R2, 0)) {
-      play_sound_track(ANNOYED_SND);
+      sound->play(ANNOYED_SND);
     } else {
-      play_sound_track(random(PROC_SND_START, PROC_SND_END));
+      sound->play(random(PROC_SND_START, PROC_SND_END));
     }
   }
 
@@ -358,7 +307,7 @@ void loop() {
 
   // MOVE OUT THE WAY
   if (Xbox.getButtonClick(L3, 0))  {
-    play_sound_track(IMPERIAL_SIREN);
+    sound->play(IMPERIAL_SIREN);
   }
 
   // Change drivespeed if drive is eanbled
@@ -367,20 +316,19 @@ void loop() {
   if (Xbox.getButtonClick(R3, 0) && isDriveEnabled) {
     //if in lowest speed
     if (drivespeed == DRIVESPEED1) {
-      //change to medium speed and play sound 3-tone
+      //change to medium speed
       drivespeed = DRIVESPEED2;
       Xbox.setLedOn(LED2, 0);
     } else if (drivespeed == DRIVESPEED2 && (DRIVESPEED3 != 0)) {
-      //change to high speed and play sound scream
+      //change to high speed 
       drivespeed = DRIVESPEED3;
       Xbox.setLedOn(LED3, 0);
     } else {
       //we must be in high speed
-      //change to low speed and play sound 2-tone
       drivespeed = DRIVESPEED1;
       Xbox.setLedOn(LED1, 0);
     }
-    play_sound_track(PROC_SND_START);
+    sound->play(PROC_SND_START);
   }
 
   drive();
@@ -463,7 +411,7 @@ void automation_mode() {
       automateMillis = millis();
       automateAction = random(1, 5);
       if (automateAction > 1) {
-        play_sound_track(random(AUTO_SND_START, AUTO_SND_END));
+        sound->play(random(AUTO_SND_START, AUTO_SND_END));
       }
       if (automateAction < 4) {
         Syren10.motor(1, turnDirection);
@@ -479,59 +427,4 @@ void automation_mode() {
       automateDelay = random(AUTO_TIME_MIN, AUTO_TIME_MAX);
     }
   }
-}
-
-void print_wav_info() {
-  wTrig.getVersion();
-  uint8_t* sysVersion;
-  sysVersion = wTrig.returnSysVersion();
-  Log.notice(F("Sys Version: %x"CR), sysVersion);
-  wTrig.getSysInfo();
-  Log.notice(F(" -- Number of tracks: %d"CR), wTrig.returnSysinfoTracks());
-  Log.notice(F(" -- Number of voices: %d"CR), wTrig.returnSysinfoVoices());
-}
-
-void play_sound_track(int track) {
-  wTrig.getStatus();
-  uint16_t* tracks = wTrig.returnTracksPlaying();
-
-  if (track > BG_MUS_START) {
-    isBgMusicPlaying = !isBgMusicPlaying;
-  }
-
-  for (byte i = 0; i < 14; i++) {
-    Log.trace(F("Background tracks [%d] : %d"CR), i, tracks[i]);
-    if (tracks[i] <= BG_MUS_START) {
-      wTrig.trackStop(tracks[i]);
-    } else if (tracks[i] > BG_MUS_START && track > BG_MUS_START && isBgMusicPlaying == false) {
-      wTrig.trackStop(tracks[i]);
-    }
-  }
-
-  Log.notice(F("Playing track: %d"CR), track);
-  if (track > BG_MUS_START && isBgMusicPlaying == false) {
-    return;
-  }
-  wTrig.trackPlayPoly(track);
-}
-
-void set_volume(int vol) {
-  Log.notice(F("Setting volume: %d"CR), vol);
-  wTrig.masterGain(vol);
-}
-
-void send_periscope_command(byte cmd) {
-  // 0: DO NOTHING - ALLOW I2C TO TAKE CONTROL
-  // 1: DOWN POSITION - ALL OFF
-  // 2: FAST UP - RANDOM LIGHTS
-  // 3: SEARCHLIGHT - CCW
-  // 4: RANDOM - FAST
-  // 5: RANDOM - SLOW
-  // 6: DAGOBAH - WHITE LIGHTS - FACE FORWARD
-  // 7: SEARCHLIGHT CW
-  byte dev_address = 0x20;
-  Wire.beginTransmission(dev_address); // transmit to device #20
-  Wire.write(cmd); // sends one byte 0011
-  Wire.endTransmission(); // stop transmitting
-  Log.notice(F("Sent command: %d to device ID: %d"CR), cmd, dev_address);
 }

@@ -19,8 +19,8 @@
 
 #define SV_UA_BOTTOM 1
 #define SV_UA_BOTTOM_IS_INVERSED true
-#define SV_UA_BOTTOM_MIN 300
-#define SV_UA_BOTTOM_MAX 550
+#define SV_UA_BOTTOM_MIN 290
+#define SV_UA_BOTTOM_MAX 540
 
 class UA {
 
@@ -35,13 +35,14 @@ class UA {
 
   public:
     static UA* getInstance();
-    void set_upper_arm_position(byte pos);
-    void set_lower_arm_position(byte pos);
-    void toggle_upper();
-    void toggle_lower();
+    void setup();
+    void setUpperArmPosition(byte pos);
+    void setLowerArmPosition(byte pos);
+    void toggleUpper();
+    void toggleLower();
 
-    void open_all();
-    void close_all();
+    void openAll();
+    void closeAll();
 };
 #endif //UA_H_
 

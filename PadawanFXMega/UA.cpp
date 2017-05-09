@@ -16,45 +16,49 @@ UA* UA::getInstance() {
   return &ua;
 }
 
-void UA::set_upper_arm_position(byte pos) {
+void UA::setup() {
+  closeAll();
+}
+
+void UA::setUpperArmPosition(byte pos) {
   ts->setServoPosition(SV_UA_BOARD, SV_UA_TOP, pos, 0);
   Log.notice(F("Setting top UA to: %d"CR), pos);
 }
 
-void UA::set_lower_arm_position(byte pos) {
+void UA::setLowerArmPosition(byte pos) {
   ts->setServoPosition(SV_UA_BOARD, SV_UA_BOTTOM, pos, 0);
   Log.notice(F("Setting bottom UA to: %d"CR), pos);
 }
 
-void UA::toggle_upper() {
+void UA::toggleUpper() {
   byte pos = 0;
   if (!is_top_open) {
     pos = 127;
   }
   is_top_open = !is_top_open;
-  set_upper_arm_position(pos);
+  setUpperArmPosition(pos);
 }
 
-void UA::toggle_lower() {
+void UA::toggleLower() {
   byte pos = 0;
   if (!is_bottom_open) {
     pos = 127;
   }
   is_bottom_open = !is_bottom_open;
-  set_lower_arm_position(pos);
+  setLowerArmPosition(pos);
 }
 
-void UA::open_all() {
+void UA::openAll() {
   is_top_open = false;
   is_bottom_open = false;
-  toggle_upper();
-  toggle_lower();
+  toggleUpper();
+  toggleLower();
 }
 
-void UA::close_all() {
+void UA::closeAll() {
   is_top_open = true;
   is_bottom_open = true;
-  toggle_upper();
-  toggle_lower();
+  toggleUpper();
+  toggleLower();
 }
 

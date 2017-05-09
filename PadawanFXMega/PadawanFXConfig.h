@@ -47,5 +47,7 @@ const byte RAMPING = 4;
 #define MAX_VOLTAGE 16.8
 // volt = (analogRead(A0) / 1024.) * 25;
 // map(volt, 12.8, 16.8, 0, 100);
+// S to Arduino Analog pin
+// - to Arduino Ground
 
 #endif //PADAWAN_FX_CONFIG_H_
