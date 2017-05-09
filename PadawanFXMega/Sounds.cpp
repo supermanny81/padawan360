@@ -1,6 +1,6 @@
 #include <ArduinoLog.h>
 #include "Sounds.h"
-#include "SoundConfig.h"
+#include "TrackConfig.h"
 
 Sounds::Sounds() {}
 

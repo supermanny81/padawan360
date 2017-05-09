@@ -55,10 +55,11 @@
 #include <Wire.h>
 #include <XBOXRECV.h>
 #include <ArduinoLog.h>
+#include "PadawanFXConfig.h"
 #include "Periscope.h"
 #include "Sounds.h"
 #include "TrackConfig.h"
-#include "PadawanFXConfig.h"
+#include "Voltage.h"
 #include "UA.h"
 
 // need to include headers and impl in the ino to get around Arduino IDE compile issues
@@ -99,6 +100,7 @@ Periscope* periscope = Periscope::getInstance();
 Sounds* sound = Sounds::getInstance();
 TimedServos* ts = TimedServos::getInstance();
 UA* ua = UA::getInstance();
+Voltage* voltage = Voltage::getInstance();
 
 void setup() {
   Serial.begin(115200);
@@ -302,7 +304,9 @@ void loop() {
 
   // get battery levels
   if (Xbox.getButtonClick(XBOX, 0)) {
+    voltage->sample();
     Log.notice(F("Xbox Battery Level: %d"CR), Xbox.getBatteryLevel(0));
+    Log.notice(F("System Battery Level: %d (%d\\%)"CR), voltage->getVCC(), voltage->getVCCPct());
   }
 
   // MOVE OUT THE WAY
