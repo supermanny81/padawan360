@@ -220,7 +220,7 @@ void loop() {
   // LEFT on control pad
   if (Xbox.getButtonClick(LEFT, 0)) {
     if (Xbox.getButtonPress(R1, 0)) {
-
+      // Nothing... yet
     } else if (Xbox.getButtonPress(L1, 0)) {
       periscope->toggleRandom();
     } else {
@@ -232,7 +232,7 @@ void loop() {
   if (Xbox.getButtonClick(RIGHT, 0)) {
     //volume down
     if (Xbox.getButtonPress(R1, 0)) {
-      //Nothing, yet?
+      //Nothing.... yet
     } else if (Xbox.getButtonPress(L1, 0)) {
       periscope->toggleSearchMode();
     } else {
@@ -332,8 +332,8 @@ void loop() {
   }
 
   drive();
-  is_disconnect();
-  automation_mode();
+  isDisconnecting();
+  automationMode();
   ts->loop();
 }
 
@@ -387,7 +387,7 @@ void drive() {
    Determines if the controller needs to be shutdown.  The disconnect signal is sent once the XBOX
    button has been pressed for more than 3s, a rumble will indicate the controller is being shutdown.
 */
-void is_disconnect() {
+void isDisconnecting() {
   if (Xbox.getButtonPress(XBOX, 0)) {
     if (xboxBtnPressedSince == 0) {
       xboxBtnPressedSince = millis();
@@ -403,7 +403,7 @@ void is_disconnect() {
   }
 }
 
-void automation_mode() {
+void automationMode() {
   // Plays random sounds or dome movements for automations when in automation mode
   if (isInAutomationMode) {
     unsigned long currentMillis = millis();
