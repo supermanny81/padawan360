@@ -9,7 +9,7 @@
 
 class Voltage {
   private:
-    float volts = 0;
+    float volts = 0.00;
     byte percent = 0;
     Voltage() {};
     Voltage(Voltage const&); // copy disabled
@@ -27,7 +27,7 @@ class Voltage {
                     MIN_VOLTAGE, MAX_VOLTAGE, 0, 100);
     }
 
-    int getVCC() {
+    float getVCC() {
       return volts;
     }
 

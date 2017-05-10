@@ -28,16 +28,14 @@
     Mega         ST
     ====         ===========
     GND <------>  0v
-    Tx1 <------>  S2
-    Rx1 <------>  S1
+    Tx1 <------>  S1
 
   For Syren10en Packetized Serial Set Switchs 1 & 2 Down, All Others Up (9600 baud)
 
     Mega         Syren
     ====         ===========
     GND <------>  0v
-    Tx2 <------>  S2
-    Rx2 <------>  S1
+    Tx2 <------>  S1
 
   Connect 2 wires from the UNO to the WAV Trigger's serial connector:
 
@@ -50,11 +48,12 @@
     Power the WAV trigger separately.
 
 */
+#include <ArduinoLog.h>
 #include <Sabertooth.h>
 #include <SyRenSimplified.h>
 #include <Wire.h>
 #include <XBOXRECV.h>
-#include <ArduinoLog.h>
+
 #include "PadawanFXConfig.h"
 #include "Periscope.h"
 #include "Sounds.h"
@@ -90,12 +89,20 @@ char driveThrottle = 0;
 char sticknum = 0;
 char domeThrottle = 0;
 char turnThrottle = 0;
+LEDEnum ledState;
+long ledStateUpdate = 0;
+LEDModeEnum ledModeState;
+long ledModeStateUpdate = 0;
+byte ledScene = 0;
+boolean isLedAnimate = false;
+long ledAnimatedSince = 0;
 long xboxBtnPressedSince = 0;
 boolean firstLoadOnConnect = false;
 
 ArduinoUtil util = ArduinoUtil();
 USB Usb;
 XBOXRECV Xbox(&Usb);
+
 Periscope* periscope = Periscope::getInstance();
 Sounds* sound = Sounds::getInstance();
 TimedServos* ts = TimedServos::getInstance();
@@ -104,8 +111,10 @@ Voltage* voltage = Voltage::getInstance();
 
 void setup() {
   Serial.begin(115200);
-  // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
+  // Wait for serial port to connect - used on Leonardo, Teensy and other boards with
+  // built-in USB CDC serial connection
   while (!Serial);
+
   // Initialize with log level and log output.
   Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
   Log.verbose(F("PadawanFX"CR));
@@ -129,8 +138,8 @@ void setup() {
   Sabertooth2xXX.turn(0);
 
   // let the connected i2c slaves initialize
-  delay(1000);
-  
+  delay(250);
+
   Wire.begin();
   // use fast IIC
   TWBR = 12; // upgrade to 400KHz!
@@ -141,6 +150,7 @@ void setup() {
 void loop() {
   // used in testing, keeps track of the number of cycles being run
   util.countCycles();
+  animateLed();
   Usb.Task();
 
   //if we're not connected, return so we don't bother doing anything else.
@@ -160,25 +170,25 @@ void loop() {
     firstLoadOnConnect = true;
     isDriveEnabled = false;
     sound->play(CONTROLLER_CONNECTED);
-    Xbox.setLedMode(ROTATING, 0);
+    setLedMode(ROTATING, 0);
   }
 
   // enable / disable right stick (droid movement) & play a sound to signal motor state
   if (Xbox.getButtonClick(START, 0)) {
     if (isDriveEnabled) {
       isDriveEnabled = false;
-      Xbox.setLedMode(ROTATING, 0);
+      setLedMode(ROTATING, 0);
       sound->play(random(HUM_SND_START, HUM_SND_END));
     } else {
       isDriveEnabled = true;
       sound->play(PROC_SND_START);
       // //When the drive is enabled, set our LED accordingly to indicate speed
       if (drivespeed == DRIVESPEED1) {
-        Xbox.setLedOn(LED1, 0);
+        setLedOn(LED1, 0);
       } else if (drivespeed == DRIVESPEED2 && (DRIVESPEED3 != 0)) {
-        Xbox.setLedOn(LED2, 0);
+        setLedOn(LED2, 0);
       } else {
-        Xbox.setLedOn(LED3, 0);
+        setLedOn(LED3, 0);
       }
     }
   }
@@ -306,7 +316,8 @@ void loop() {
   if (Xbox.getButtonClick(XBOX, 0)) {
     voltage->sample();
     Log.notice(F("Xbox Battery Level: %d"CR), Xbox.getBatteryLevel(0));
-    Log.notice(F("System Battery Level: %d (%d\\%)"CR), voltage->getVCC(), voltage->getVCCPct());
+    Log.notice(F("System Battery Level: %s (%d percent)"CR), String(voltage->getVCC()).c_str(), voltage->getVCCPct());
+    isLedAnimate = true;
   }
 
   // MOVE OUT THE WAY
@@ -322,15 +333,15 @@ void loop() {
     if (drivespeed == DRIVESPEED1) {
       //change to medium speed
       drivespeed = DRIVESPEED2;
-      Xbox.setLedOn(LED2, 0);
+      setLedOn(LED2, 0);
     } else if (drivespeed == DRIVESPEED2 && (DRIVESPEED3 != 0)) {
-      //change to high speed 
+      //change to high speed
       drivespeed = DRIVESPEED3;
-      Xbox.setLedOn(LED3, 0);
+      setLedOn(LED3, 0);
     } else {
       //we must be in high speed
       drivespeed = DRIVESPEED1;
-      Xbox.setLedOn(LED1, 0);
+      setLedOn(LED1, 0);
     }
     sound->play(PROC_SND_START);
   }
@@ -339,6 +350,62 @@ void loop() {
   isDisconnecting();
   automationMode();
   ts->loop();
+}
+
+void setLedMode(LEDModeEnum ledMode, uint8_t controller) {
+  ledModeState = ledMode;
+  Xbox.setLedMode(ledMode, 0);
+  isLedAnimate = false;
+  ledModeStateUpdate = millis();
+}
+
+void setLedOn(LEDEnum led, uint8_t controller) {
+  ledState = led;
+  Xbox.setLedOn(led, controller);
+  isLedAnimate = false;
+  ledStateUpdate = millis();
+}
+
+void animateLed() {
+  if(isLedAnimate == true) {
+    voltage->sample();
+    if (ledAnimatedSince == 0) {
+      ledAnimatedSince = millis();
+      Xbox.setLedOn(chooseLED(Xbox.getBatteryLevel(0)*25), 0);
+      ledScene++;
+    } else if (millis() - ledAnimatedSince > 2000 && ledScene == 1) {
+      Xbox.setLedOn(OFF, 0);
+      ledScene++;
+    } else if (millis() - ledAnimatedSince > 2500 && ledScene == 2) {
+      Xbox.setLedOn(chooseLED(voltage->getVCCPct()), 0);
+      ledScene++;
+    } else if (millis() - ledAnimatedSince > 4500 && ledScene == 3) {
+      Xbox.setLedOn(OFF, 0);
+      ledScene++;
+    } else if (millis() - ledAnimatedSince > 5000 && ledScene == 4) {
+      if (ledStateUpdate > ledModeStateUpdate) {
+        setLedOn(ledState, 0);
+      } else {
+        setLedMode(ledModeState, 0);
+      }
+      ledScene++;
+    }
+  } else {
+    ledAnimatedSince = 0;
+    ledScene = 0;
+  }
+}
+
+LEDEnum chooseLED(byte level) {
+  if (level > 75) {
+    return LED4;
+  } else if (level > 50) {
+    return LED3;
+  } else if (level > 25) {
+    return LED2;
+  } else if (level >=0) {
+    return LED1;
+  }
 }
 
 void drive() {
@@ -395,12 +462,12 @@ void isDisconnecting() {
   if (Xbox.getButtonPress(XBOX, 0)) {
     if (xboxBtnPressedSince == 0) {
       xboxBtnPressedSince = millis();
-    } else if (millis() - xboxBtnPressedSince >= 1800 && millis() - xboxBtnPressedSince < 2100) {
-      Xbox.setRumbleOn(50, 127, 0);
+    } else if (millis() - xboxBtnPressedSince >= 2000 && millis() - xboxBtnPressedSince < 2500) {
+      Xbox.setRumbleOn(0, 127, 0);
       Log.warning(F("Shutting down controller.  Elapsed time: %d"CR), millis() - xboxBtnPressedSince);
-    } else if (millis() - xboxBtnPressedSince >= 2100) {
+    } else if (millis() - xboxBtnPressedSince >= 2500) {
       xboxBtnPressedSince = 0;
-      Xbox.disconnect(0); 
+      Xbox.disconnect(0);
     }
   } else {
     xboxBtnPressedSince = 0;
