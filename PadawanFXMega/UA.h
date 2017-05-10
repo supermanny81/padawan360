@@ -36,8 +36,9 @@ class UA {
   public:
     static UA* getInstance();
     void setup();
-    void setUpperArmPosition(byte pos);
-    void setLowerArmPosition(byte pos);
+    void setUpperArmPosition(byte pos, int timeAllotted = 0);
+    void setLowerArmPosition(byte pos, int timeAllotted = 0);
+    
     void toggleUpper();
     void toggleLower();
 

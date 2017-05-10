@@ -20,13 +20,13 @@ void UA::setup() {
   closeAll();
 }
 
-void UA::setUpperArmPosition(byte pos) {
-  ts->setServoPosition(SV_UA_BOARD, SV_UA_TOP, pos, 0);
+void UA::setUpperArmPosition(byte pos, int timeAllotted = 0) {
+  ts->setServoPosition(SV_UA_BOARD, SV_UA_TOP, pos, timeAllotted);
   Log.notice(F("Setting top UA to: %d"CR), pos);
 }
 
-void UA::setLowerArmPosition(byte pos) {
-  ts->setServoPosition(SV_UA_BOARD, SV_UA_BOTTOM, pos, 0);
+void UA::setLowerArmPosition(byte pos, int timeAllotted = 0) {
+  ts->setServoPosition(SV_UA_BOARD, SV_UA_BOTTOM, pos, timeAllotted);
   Log.notice(F("Setting bottom UA to: %d"CR), pos);
 }
 
